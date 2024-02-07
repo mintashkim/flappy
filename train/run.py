@@ -8,4 +8,4 @@ PPO_path = PPO_path = os.path.join('..', 'train', 'saved_models', 'best_model')
 env = FlappyEnv(render_mode="human")
 
 model = PPO.load(PPO_path, env=env)
-model.learn(total_timesteps=100000)
+model.learn(total_timesteps=100, progress_bar=True)
