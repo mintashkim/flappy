@@ -212,7 +212,6 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         # post-process action
         if self.lpf_action:
             action_filtered = self.action_filter.filter(action)
-            # u_to_apply = action_in_SI*self._acs_alpha + self.last_acs*(1-self._acs_alpha)
         else:
             action_filtered = np.copy(action)
 
