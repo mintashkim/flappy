@@ -121,7 +121,7 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
             "qpos": self.data.qpos.size,
             "qvel": self.data.qvel.size,
         }
-        self.xa = np.zeros(3 * self.p.n_Wagner) # aero()
+        self.reset_noise_scale = reset_noise_scale
 
         # Info for normalizing the state
         self._init_action_filter()
@@ -129,8 +129,7 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         self._seed()
         self.reset()
         self._init_env()
-
-        self.reward_plot = []
+        
 
     @property
     def dt(self) -> float:
@@ -169,6 +168,16 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         info = self._get_reset_info
         return obs, info
     
+    def _reset_env(self, randomize=False):
+        self.timestep    = 0 # discrete timestep, k
+        self.time_in_sec = 0.0 # time
+        self.reset_model()
+        # use action
+        self.last_act   = np.zeros(self.n_action)
+        self.reward     = None
+        self.terminated = None
+        self.info       = {}
+
     def reset_model(self):
         noise_low = -self._reset_noise_scale
         noise_high = self._reset_noise_scale
@@ -181,18 +190,6 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         )
         self.set_state(qpos, qvel)
         return self._get_obs()
-
-    def _reset_env(self, randomize=False):
-        self.timestep    = 0 # discrete timestep, k
-        self.time_in_sec = 0.0 # time 
-        # NOTE: set robot init position
-        self.goal = np.concatenate([np.zeros(3), [2.0, 0.0, 0.0]]) # goal is x y z vx vy vz
-        self.sim.reset()
-        # use action
-        self.last_act   = np.zeros(self.n_action)
-        self.reward     = None
-        self.terminated = None
-        self.info       = {}
 
     def _init_env_randomizer(self):
         self.env_randomizer = EnvRandomizer(self.sim)
