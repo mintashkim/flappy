@@ -30,7 +30,7 @@ from rotation_transformations import *
 from R_body import R_body
 
 
-DEFAULT_CAMERA_CONFIG = {"trackbodyid": 0, "distance": 5.0,}
+DEFAULT_CAMERA_CONFIG = {"trackbodyid": 0, "distance": 10.0,}
 TRAJECTORY_TYPES = {"linear": 0, "circular": 1, "setpoint": 2}
 
 class FlappyEnv(MujocoEnv, utils.EzPickle):
@@ -82,15 +82,14 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         self.history_len        = self.history_len_short
         self.previous_obs       = deque(maxlen=self.history_len)
         self.previous_act       = deque(maxlen=self.history_len)
-        
-        self.action_space = Box(low=-100, high=100, shape=(self.n_action,))
-        self.observation_space = Box(low=-np.inf, high=np.inf, shape=(41,)) # NOTE: change to the actual number of obs to actor policy
+        self.action_space       = Box(low=-100, high=100, shape=(self.n_action,))
+        self.observation_space  = Box(low=-np.inf, high=np.inf, shape=(13,)) # NOTE: change to the actual number of obs to actor policy
 
         # NOTE: the low & high does not actually limit the actions output from MLP network, manually clip instead
-        self.pos_lb = np.array([-5, -5, 0.2]) # fight space dimensions: xyz
+        self.pos_lb = np.array([-5, -5, 1]) # fight space dimensions: xyz
         self.pos_ub = np.array([5, 5, 5])
-        self.vel_lb = np.array([-2, -2, -2])
-        self.vel_ub = np.array([2, 2, 2])
+        self.vel_lb = np.array([-5, -5, -5])
+        self.vel_ub = np.array([5, 5, 5])
 
         self.action_lower_bounds = np.array([-30,0,0,0,0,0,0])
         self.action_upper_bounds = np.array([0,2,2,2,2,0.5,0.5])
@@ -139,6 +138,7 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         action = self.action_space.sample()
         print("Sample action: {}".format(action))
         print("Control range: {}".format(self.model.actuator_ctrlrange))
+        print("Actual control range: {}".format(np.vstack([self.action_lower_bounds_actual, self.action_upper_bounds_actual])))
         print("Time step(dt): {}".format(self.dt))
         
     def _init_action_filter(self):
@@ -205,19 +205,15 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
     def step(self, action_normalized, restore=False):
         assert action_normalized.shape[0] == self.n_action and -1.0 <= action_normalized.all() <= 1.0
         action = self._act_norm2actual(action_normalized)
-        if self.timestep == 0:
-            self.action_filter.init_history(action)
+        if self.timestep == 0: self.action_filter.init_history(action)
         # post-process action
-        if self.lpf_action:
-            action_filtered = self.action_filter.filter(action)
-        else:
-            action_filtered = np.copy(action)
+        if self.lpf_action: action_filtered = self.action_filter.filter(action)
+        else: action_filtered = np.copy(action)
 
         self.do_simulation(action_filtered, self.frame_skip)
         self._update_data(step=True)
         self.last_act = action
 
-        print(self.data.sensordata)
         obs = self._get_obs()
         reward, reward_dict = self._get_reward(action)
         self.info["reward_dict"] = reward_dict
@@ -225,7 +221,7 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         if self.render_mode == "human":
             self.render()
 
-        terminated = self._terminated()
+        terminated = self._terminated(obs)
         truncated = False
         
         return obs, reward, terminated, truncated, self.info
@@ -283,9 +279,9 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         return xd, R_B
 
     def _update_data(self, step=True):
-        # NOTE: modify obs states, ground truth states 
-        self.obs_states = self.sim.get_obseverable()
-        self.gt_states = self.sim.states
+        # NOTE: Need to be modifid to obs states and ground truth states 
+        self.obs_states = self._get_obs()
+        self.gt_states = self._get_obs()
         if step:
             self.timestep += 1
             self.time_in_sec += self.secs_per_env_step
@@ -295,35 +291,44 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
     def _get_reward(self, action):
         names = ['position_error', 'velocity_error', 'orientation_error', 'input', 'delta_acs']
 
-        w_position    = 1.0
-        w_velocity    = 1.0
-        w_orientation = 0.2
-        w_input       = 0.002
-        w_delta_act   = 0.01
+        w_position         = 1.0
+        w_velocity         = 1.0
+        w_angular_velocity = 1.0
+        w_orientation      = 0.2
+        w_input            = 0.002
+        w_delta_act        = 0.01
 
-        reward_weights = np.array([w_position, w_velocity, w_orientation, w_input, w_delta_act])
+        reward_weights = np.array([w_position, w_velocity, w_angular_velocity, w_orientation, w_input, w_delta_act])
         weights = reward_weights / np.sum(reward_weights)  # weight can be adjusted later
 
         scale_pos       = 1.0
         scale_vel       = 1.0
+        scale_ang_vel   = 1.0
         scale_ori       = 1.0
         scale_input     = 1.0
         scale_delta_act = 1.0
 
         desired_pos = np.array([0.0, 0.0, 0.5]).reshape(3,1) # x y z 
         desired_vel = np.array([0.0, 0.0, 0.0]).reshape(3,1) # vx vy vz
+        desired_ang_vel = np.array([0.0, 0.0, 0.0]).reshape(3,1) # \omega_x \omega_y \omega_z
         desired_ori = np.array([0.0, 0.0, 0.0]).reshape(3,1) # roll, pitch, yaw
-        current_pos = self.data.qpos
-        current_vel = self.data.qvel
-        current_ori = quat2euler_raw(self.data.qpos[3:7]) # euler_mes
+        
+        obs = self._get_obs()
+        current_pos = obs[0:3]
+        current_vel = obs[7:10]
+        current_ang_vel = obs[10:13]
+        current_ori = quat2euler_raw(obs[3:7]) # euler_mes
         
         pos_err = np.linalg.norm(current_pos - desired_pos) 
         r_pos = np.exp(-scale_pos * pos_err)
 
-        vel_err = np.linalg.norm(current_vel- desired_vel) 
+        vel_err = np.linalg.norm(current_vel - desired_vel) 
         r_vel = np.exp(-scale_vel * vel_err)  # scale_vel need to be adjust later
 
-        ori_err = np.linalg.norm(current_ori- desired_ori)
+        ang_vel_err = np.linalg.norm(current_ang_vel - desired_ang_vel)
+        r_ang_vel = np.exp(-scale_ang_vel * ang_vel_err)  # scale_vel need to be adjust later
+
+        ori_err = np.linalg.norm(current_ori - desired_ori)
         r_ori = np.exp(-scale_ori * ori_err)
 
         input_err = np.linalg.norm(action) 
@@ -332,23 +337,23 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         delta_act_err = np.linalg.norm(action - self.last_act) 
         r_delta_act = np.exp(-scale_delta_act * delta_act_err)
 
-        rewards = np.array([r_pos, r_vel, r_ori, r_input, r_delta_act])
+        rewards = np.array([r_pos, r_vel, r_ang_vel, r_ori, r_input, r_delta_act])
         total_reward = np.sum(weights * rewards)
         reward_dict = dict(zip(names, weights * rewards))
 
         return total_reward, reward_dict
 
-    def _terminated(self):
-        if not((self.data.qpos[0:3] <= self.pos_ub).all() 
-                and (self.data.qpos[0:3] >= self.pos_lb).all()):
-            print("Out of position bounds ", self.data.qpos[0:3], self.timestep)
+    def _terminated(self, obs):
+        if not((obs[0:3] <= self.pos_ub).all() 
+           and (obs[0:3] >= self.pos_lb).all()):
+            print("Out of position bounds: {pos}  |  Timestep: {timestep}".format(pos=obs[0:3], timestep=self.timestep))
             return True
-        if not((self.data.qvel[0:3] <= self.vel_ub).all() 
-                and (self.data.qvel[0:3] >= self.vel_lb).all()):
-            print("Out of velocity bounds ", self.data.qvel[0:3], self.timestep)
+        if not((obs[7:10] <= self.vel_ub).all() 
+           and (obs[7:10] >= self.vel_lb).all()):
+            print("Out of velocity bounds: {vel}  |  Timestep: {timestep}".format(vel=obs[7:10], timestep=self.timestep))
             return True
         if self.timestep >= self.max_timesteps:
-            print("Max step reached: {}".format(self.max_timesteps))
+            print("Max step reached: {timestep}".format(timestep=self.max_timesteps))
             return True
         else:
             return False
