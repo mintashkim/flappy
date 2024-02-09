@@ -30,7 +30,7 @@ from rotation_transformations import *
 from R_body import R_body
 
 
-DEFAULT_CAMERA_CONFIG = {"trackbodyid": 0, "distance": 10.0,}
+DEFAULT_CAMERA_CONFIG = {"trackbodyid": 0, "distance": 10.0}
 TRAJECTORY_TYPES = {"linear": 0, "circular": 1, "setpoint": 2}
 
 class FlappyEnv(MujocoEnv, utils.EzPickle):
@@ -95,6 +95,7 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         self.action_upper_bounds = np.array([0,2,2,2,2,0.5,0.5])
         self.action_bounds_scale = 0.2
         self.action_lower_bounds_actual = self.action_lower_bounds + self.action_bounds_scale * self.action_upper_bounds
+        
         self.action_upper_bounds_actual = (1 - self.action_bounds_scale) * self.action_upper_bounds
         
         # MujocoEnv

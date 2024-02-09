@@ -10,7 +10,7 @@ from envs.flappy_env import FlappyEnv
 
 
 log_path = os.path.join('logs')
-save_path = os.path.join('saved_models')
+save_path = os.path.join('saved_models', 'PPO')
 best_model_save_path = os.path.join('saved_models', 'best_model')
 env = FlappyEnv(render_mode="human")
 env = VecMonitor(DummyVecEnv([lambda: env]))
@@ -41,13 +41,18 @@ model.learn(total_timesteps=100000, # The total number of samples (env steps) to
             progress_bar=True,
             callback=eval_callback)
 
-evaluate_policy(model, env, n_eval_episodes=10, render=True)
-env.close()
-
 model.save(save_path)
+
+evaluate_policy(model, env, n_eval_episodes=5, render=True)
+
 
 obs_sample = model.env.observation_space.sample()
 print("Pre saved", model.predict(obs_sample, deterministic=True))
 del model # delete trained model to demonstrate loading
-loaded_model = PPO.load(save_path)
+
+loaded_model = PPO.load(save_path+"/PPO")
 print("Loaded", loaded_model.predict(obs_sample, deterministic=True))
+
+print("Test start")
+evaluate_policy(loaded_model, env, n_eval_episodes=10, render=True)
+env.close()
