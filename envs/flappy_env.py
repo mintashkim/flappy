@@ -45,7 +45,7 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         lpf_action    = True,
         traj_type     = False,
         # MujocoEnv
-        xml_file: str = "../assets/Flappy_v3.xml",
+        xml_file: str = "../assets/Flappy_v6.xml",
         frame_skip: int = 2,
         default_camera_config: Dict[str, Union[float, int]] = DEFAULT_CAMERA_CONFIG,
         reset_noise_scale: float = 0.01,
@@ -84,7 +84,7 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         self.previous_act       = deque(maxlen=self.history_len)
         
         self.action_space = Box(low=-100, high=100, shape=(self.n_action,))
-        self.observation_space = Box(low=-np.inf, high=np.inf, shape=(41,)) # NOTE: change to the actual number of obs to actor policy
+        self.observation_space = Box(low=-np.inf, high=np.inf, shape=(28,)) # NOTE: change to the actual number of obs to actor policy
         self.observation_space_policy = Box(low=-np.inf, high=np.inf, shape=(454,)) # NOTE: change to the actual number of obs to actor policy
         self.observation_space_value_func = Box(low=-np.inf, high=np.inf, shape=(454,)) # NOTE: change to the actual number of obs to the value function
         
@@ -121,7 +121,7 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
             "qpos": self.data.qpos.size,
             "qvel": self.data.qvel.size,
         }
-        self.reset_noise_scale = reset_noise_scale
+        self._reset_noise_scale = reset_noise_scale
 
         # Info for normalizing the state
         self._init_action_filter()
@@ -229,7 +229,6 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
 
         terminated = self._terminated()
         truncated = False
-        self.reward_plot.append(reward)
         
         return obs, reward, terminated, truncated, self.info
     
