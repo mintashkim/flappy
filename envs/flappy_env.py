@@ -30,7 +30,7 @@ from rotation_transformations import *
 from R_body import R_body
 
 
-DEFAULT_CAMERA_CONFIG = {"trackbodyid": 0, "distance": 10.0,}
+DEFAULT_CAMERA_CONFIG = {"trackbodyid": 0, "distance": 5.0,}
 TRAJECTORY_TYPES = {"linear": 0, "circular": 1, "setpoint": 2}
 
 class FlappyEnv(MujocoEnv, utils.EzPickle):
@@ -84,13 +84,11 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         self.previous_act       = deque(maxlen=self.history_len)
         
         self.action_space = Box(low=-100, high=100, shape=(self.n_action,))
-        self.observation_space = Box(low=-np.inf, high=np.inf, shape=(28,)) # NOTE: change to the actual number of obs to actor policy
-        self.observation_space_policy = Box(low=-np.inf, high=np.inf, shape=(454,)) # NOTE: change to the actual number of obs to actor policy
-        self.observation_space_value_func = Box(low=-np.inf, high=np.inf, shape=(454,)) # NOTE: change to the actual number of obs to the value function
-        
+        self.observation_space = Box(low=-np.inf, high=np.inf, shape=(41,)) # NOTE: change to the actual number of obs to actor policy
+
         # NOTE: the low & high does not actually limit the actions output from MLP network, manually clip instead
-        self.pos_lb = np.array([-20, -20, 0]) # fight space dimensions: xyz
-        self.pos_ub = np.array([20, 20, 20])
+        self.pos_lb = np.array([-5, -5, 0.2]) # fight space dimensions: xyz
+        self.pos_ub = np.array([5, 5, 5])
         self.vel_lb = np.array([-2, -2, -2])
         self.vel_ub = np.array([2, 2, 2])
 
@@ -199,7 +197,7 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
             self.sim.set_dynamics()
 
     def _get_obs(self):
-        return np.concatenate([self.data.qpos, self.data.qvel]).ravel()
+        return self.data.sensordata
 
     def _act_norm2actual(self, act):
         return self.action_lower_bounds_actual + (act + 1)/2.0 * (self.action_upper_bounds_actual - self.action_lower_bounds_actual)
@@ -219,7 +217,7 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         self._update_data(step=True)
         self.last_act = action
 
-        # obs_vf, obs_pol = self._get_obs(action=action, step=True)
+        print(self.data.sensordata)
         obs = self._get_obs()
         reward, reward_dict = self._get_reward(action)
         self.info["reward_dict"] = reward_dict
@@ -242,6 +240,7 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
             self.data.ctrl[:] = ctrl
             self.data.ctrl[0] = -29.8451302
 
+            # NOTE: For aero()
             # self.xd, R_body = self._get_original_states()
             # fa, ua, self.xd = aero(self.model, self.data, self.xa, self.xd, R_body)
             # # Apply Aero forces
@@ -254,6 +253,7 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
             mj.mj_step(self.model, self.data, nstep=n_frames)
             mj.mj_rnePostConstraint(self.model, self.data)
 
+    # NOTE: For aero()
     def _get_original_states(self):
         # Takes mujoco states vectors and converts to MATLAB states vectors defined in func_eom
         qpos = self.data.qpos
@@ -339,14 +339,14 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         return total_reward, reward_dict
 
     def _terminated(self):
-        # if not((self.data.qpos[0:3] <= self.pos_ub).all() 
-        #         and (self.data.qpos[0:3] >= self.pos_lb).all()):
-        #     print("Out of position bounds ", self.data.qpos[0:3], self.timestep)
-        #     return True
-        # if not((self.data.qvel[0:3] <= self.vel_ub).all() 
-        #         and (self.data.qvel[0:3] >= self.vel_lb).all()):
-        #     print("Out of velocity bounds ", self.data.qvel[0:3], self.timestep)
-        #     return True
+        if not((self.data.qpos[0:3] <= self.pos_ub).all() 
+                and (self.data.qpos[0:3] >= self.pos_lb).all()):
+            print("Out of position bounds ", self.data.qpos[0:3], self.timestep)
+            return True
+        if not((self.data.qvel[0:3] <= self.vel_ub).all() 
+                and (self.data.qvel[0:3] >= self.vel_lb).all()):
+            print("Out of velocity bounds ", self.data.qvel[0:3], self.timestep)
+            return True
         if self.timestep >= self.max_timesteps:
             print("Max step reached: {}".format(self.max_timesteps))
             return True
