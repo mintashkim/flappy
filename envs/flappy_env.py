@@ -95,7 +95,7 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         self.action_upper_bounds = np.array([0,2,2,2,2,0.5,0.5])
         self.action_bounds_scale = 0.2
         self.action_lower_bounds_actual = self.action_lower_bounds + self.action_bounds_scale * self.action_upper_bounds
-        
+
         self.action_upper_bounds_actual = (1 - self.action_bounds_scale) * self.action_upper_bounds
         
         # MujocoEnv
@@ -292,10 +292,10 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
     def _get_reward(self, action):
         names = ['position_error', 'velocity_error', 'orientation_error', 'input', 'delta_acs']
 
-        w_position         = 1.0
+        w_position         = 5.0
         w_velocity         = 1.0
-        w_angular_velocity = 1.0
-        w_orientation      = 0.2
+        w_angular_velocity = 5.0
+        w_orientation      = 1.0
         w_input            = 0.002
         w_delta_act        = 0.01
 

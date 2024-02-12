@@ -37,22 +37,27 @@ model = PPO('MlpPolicy',
             policy_kwargs={'net_arch':net_arch},
             tensorboard_log=log_path)
 
-model.learn(total_timesteps=100000, # The total number of samples (env steps) to train on
+model.learn(total_timesteps=1e+6, # The total number of samples (env steps) to train on
             progress_bar=True,
             callback=eval_callback)
 
 model.save(save_path)
 
-evaluate_policy(model, env, n_eval_episodes=5, render=True)
 
+####################################################
+#################### Evaluation ####################
+####################################################
 
 obs_sample = model.env.observation_space.sample()
-print("Pre saved", model.predict(obs_sample, deterministic=True))
+
+print("Pre saved model prediction: ")
+print(model.predict(obs_sample, deterministic=True))
 del model # delete trained model to demonstrate loading
 
 loaded_model = PPO.load(save_path+"/PPO")
-print("Loaded", loaded_model.predict(obs_sample, deterministic=True))
+print("Loaded model prediction: ")
+print(loaded_model.predict(obs_sample, deterministic=True))
 
-print("Test start")
-evaluate_policy(loaded_model, env, n_eval_episodes=10, render=True)
+print("Evaluation start")
+evaluate_policy(model, env, n_eval_episodes=5, render=True)
 env.close()
