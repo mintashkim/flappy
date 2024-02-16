@@ -11,7 +11,7 @@ from envs.flappy_env import FlappyEnv
 
 log_path = os.path.join('logs')
 save_path = os.path.join('saved_models', 'PPO')
-best_model_save_path = os.path.join('saved_models', 'best_model')
+best_model_save_path = os.path.join('saved_models', 'best_model_2')
 env = FlappyEnv(render_mode="human")
 env = VecMonitor(DummyVecEnv([lambda: env]))
 
