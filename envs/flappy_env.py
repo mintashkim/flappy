@@ -38,7 +38,7 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
     
     def __init__(
         self,
-        max_timesteps = 3000,
+        max_timesteps = 10000,
         is_visual     = False,
         randomize     = False,
         debug         = False,
@@ -95,7 +95,6 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         self.action_upper_bounds = np.array([0,2,2,2,2,0.5,0.5])
         self.action_bounds_scale = 0.2
         self.action_lower_bounds_actual = self.action_lower_bounds + self.action_bounds_scale * self.action_upper_bounds
-
         self.action_upper_bounds_actual = (1 - self.action_bounds_scale) * self.action_upper_bounds
         
         # MujocoEnv
@@ -235,7 +234,8 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
     def _step_mujoco_simulation(self, ctrl, n_frames):
         for _ in range(self.num_sims_per_env_step):
             self.data.ctrl[:] = ctrl
-            self.data.ctrl[0] = -29.8451302
+            self.data.ctrl[0] = 0
+            # self.data.ctrl[0] = -29.8451302
 
             # NOTE: For aero()
             # self.xd, R_body = self._get_original_states()

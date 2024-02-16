@@ -1,0 +1,2 @@
+Model name       Flapping Motion     Timestep Length        Training Timestep
+best_model_1     F                   2e-5                   1e+7
