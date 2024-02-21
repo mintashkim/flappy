@@ -82,6 +82,7 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         self.history_len        = self.history_len_short
         self.previous_obs       = deque(maxlen=self.history_len)
         self.previous_act       = deque(maxlen=self.history_len)
+        self.last_act_norm      = np.zeros(self.n_action)
         self.action_space       = Box(low=-100, high=100, shape=(self.n_action,))
         self.observation_space  = Box(low=-np.inf, high=np.inf, shape=(13,)) # NOTE: change to the actual number of obs to actor policy
 
@@ -210,13 +211,10 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         # post-process action
         if self.lpf_action: action_filtered = self.action_filter.filter(action)
         else: action_filtered = np.copy(action)
-        action_filtered[0] = 0
-        # action_filtered[0] = -29.8451302
+        # action_filtered[0] = 0
+        action_filtered[0] = -29.8451302
 
         self.do_simulation(action_filtered, self.frame_skip)
-        self._update_data(step=True)
-        self.last_act = action_normalized
-
         obs = self._get_obs()
         reward, reward_dict = self._get_reward(action_normalized)
         self.info["reward_dict"] = reward_dict
@@ -224,6 +222,8 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         if self.render_mode == "human":
             self.render()
 
+        self._update_data(step=True)
+        self.last_act_norm = action_normalized
         terminated = self._terminated(obs)
         truncated = False
         
@@ -298,7 +298,7 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         w_angular_velocity = 5.0
         w_orientation      = 5.0
         w_input            = 20.0
-        w_delta_act        = 0.01
+        w_delta_act        = 0.1
 
         reward_weights = np.array([w_position, w_velocity, w_angular_velocity, w_orientation, w_input, w_delta_act])
         weights = reward_weights / np.sum(reward_weights)  # weight can be adjusted later
@@ -310,42 +310,30 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         scale_input     = 1.0 # action already normalized
         scale_delta_act = 1.0
 
-        desired_pos     = np.array([0.0, 0.0, 2.0]).reshape(3,1) # x y z 
-        desired_vel     = np.array([0.0, 0.0, 0.0]).reshape(3,1) # vx vy vz
-        desired_ang_vel = np.array([0.0, 0.0, 0.0]).reshape(3,1) # \omega_x \omega_y \omega_z
-        desired_ori     = np.array([0.0, 0.0, 0.0]).reshape(3,1) # roll, pitch, yaw
+        desired_pos_norm     = np.array([0.0, 0.0, 2.0]).reshape(3,1)/5 # x y z 
+        desired_vel_norm     = np.array([0.0, 0.0, 0.0]).reshape(3,1)/5 # vx vy vz
+        desired_ang_vel_norm = np.array([0.0, 0.0, 0.0]).reshape(3,1)/10 # \omega_x \omega_y \omega_z
+        desired_ori_norm     = np.array([0.0, 0.0, 0.0]).reshape(3,1)/np.pi # roll, pitch, yaw
         
         obs = self._get_obs()
-        current_pos = obs[0:3] # [-5,5]
-        current_vel = obs[7:10] # [-5,5]
-        current_ang_vel = obs[10:13] # [-10,10]
-        current_ori = quat2euler_raw(obs[3:7])
-        pos_err = np.linalg.norm(current_pos - desired_pos) 
-        r_pos = np.exp(-scale_pos * pos_err)
+        current_pos_norm     = obs[0:3]/5 # [-5,5]
+        current_vel_norm     = obs[7:10]/5 # [-5,5]
+        current_ang_vel_norm = obs[10:13]/10 # [-10,10]
+        current_ori_norm     = quat2euler_raw(obs[3:7])/np.pi
 
-        vel_err = np.linalg.norm(current_vel - desired_vel) 
-        r_vel = np.exp(-scale_vel * vel_err)  # scale_vel need to be adjust later
+        pos_err       = np.linalg.norm(current_pos_norm - desired_pos_norm)
+        vel_err       = np.linalg.norm(current_vel_norm - desired_vel_norm)
+        ang_vel_err   = np.linalg.norm(current_ang_vel_norm - desired_ang_vel_norm)
+        ori_err       = np.linalg.norm(current_ori_norm - desired_ori_norm)
+        input_err     = np.linalg.norm(action_normalized) # It's not an error but let's just call it
+        delta_act_err = np.linalg.norm(action_normalized - self.last_act_norm) # It's not an error but let's just call it
 
-        ang_vel_err = np.linalg.norm(current_ang_vel - desired_ang_vel)
-        r_ang_vel = np.exp(-scale_ang_vel * ang_vel_err)  # scale_vel need to be adjust later
-
-        ori_err = np.linalg.norm(current_ori - desired_ori)
-        r_ori = np.exp(-scale_ori * ori_err)
-
-        input_err = np.linalg.norm(action_normalized) 
-        r_input = np.exp(-scale_input * input_err)
-
-        delta_act_err = np.linalg.norm(action_normalized - self.last_act) 
-        r_delta_act = np.exp(-scale_delta_act * delta_act_err)
-
-        rewards = np.array([r_pos, r_vel, r_ang_vel, r_ori, r_input, r_delta_act])
+        rewards = np.exp(-np.array([scale_pos, scale_vel, scale_ang_vel, scale_ori, scale_input, scale_delta_act]
+                         * np.array([pos_err, vel_err, ang_vel_err, ori_err, input_err, delta_act_err])))
         total_reward = np.sum(weights * rewards)
         reward_dict = dict(zip(names, weights * rewards))
 
         return total_reward, reward_dict
-
-    def _normalize(self, position_error, velocity_error, angular_velocity, orientation_error, input, delta_acs):
-        pass
 
     def _terminated(self, obs):
         if not((obs[0:3] <= self.pos_ub).all() 
