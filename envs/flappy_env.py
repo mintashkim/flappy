@@ -309,7 +309,7 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         scale_input     = 1.0
         scale_delta_act = 1.0
 
-        desired_pos = np.array([0.0, 0.0, 0.5]).reshape(3,1) # x y z 
+        desired_pos = np.array([0.0, 0.0, 2.0]).reshape(3,1) # x y z 
         desired_vel = np.array([0.0, 0.0, 0.0]).reshape(3,1) # vx vy vz
         desired_ang_vel = np.array([0.0, 0.0, 0.0]).reshape(3,1) # \omega_x \omega_y \omega_z
         desired_ori = np.array([0.0, 0.0, 0.0]).reshape(3,1) # roll, pitch, yaw
