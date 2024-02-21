@@ -10,8 +10,7 @@ from envs.flappy_env import FlappyEnv
 
 
 log_path = os.path.join('logs')
-save_path = os.path.join('saved_models', 'PPO')
-best_model_save_path = os.path.join('saved_models', 'best_model_2')
+save_path = os.path.join('saved_models')
 env = FlappyEnv(render_mode="human")
 env = VecMonitor(DummyVecEnv([lambda: env]))
 
@@ -19,7 +18,7 @@ stop_callback = StopTrainingOnRewardThreshold(reward_threshold=1000, verbose=1)
 eval_callback = EvalCallback(env,
                              callback_on_new_best=stop_callback,
                              eval_freq=10000,
-                             best_model_save_path=best_model_save_path,
+                             best_model_save_path=save_path,
                              verbose=1)
 
 net_arch = {'pi': [512,256,256,128],
