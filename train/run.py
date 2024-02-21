@@ -53,7 +53,7 @@ print("Pre saved model prediction: ")
 print(model.predict(obs_sample, deterministic=True))
 del model # delete trained model to demonstrate loading
 
-loaded_model = PPO.load(save_path+"/PPO")
+loaded_model = PPO.load(save_path+"/best_model")
 print("Loaded model prediction: ")
 print(loaded_model.predict(obs_sample, deterministic=True))
 
