@@ -1,5 +1,5 @@
 import numpy as np 
-from . import geo_tools as geo
+import geo_tools as geo
 
 class Flat2State(object):
     def __init__(self):

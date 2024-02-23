@@ -3,6 +3,7 @@ import os
 import sys
 sys.path.append('/Users/mintaekim/Desktop/HRL/Flappy/Integrated/Flappy_Integrated/flappy_v2')
 sys.path.append('/Users/mintaekim/Desktop/HRL/Flappy/Integrated/Flappy_Integrated/flappy_v2/envs')
+import numpy as np
 import jax.numpy as jnp
 from jax import jit
 from typing import Dict, Union
@@ -82,24 +83,24 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         self.history_len        = self.history_len_short
         self.previous_obs       = deque(maxlen=self.history_len)
         self.previous_act       = deque(maxlen=self.history_len)
-        self.last_act_norm      = jnp.zeros(self.n_action)
+        self.last_act_norm      = np.zeros(self.n_action)
         self.action_space       = Box(low=-100, high=100, shape=(self.n_action,))
-        self.observation_space  = Box(low=-jnp.inf, high=jnp.inf, shape=(13,)) # NOTE: change to the actual number of obs to actor policy
+        self.observation_space  = Box(low=-np.inf, high=np.inf, shape=(13,)) # NOTE: change to the actual number of obs to actor policy
 
         # NOTE: the low & high does not actually limit the actions output from MLP network, manually clip instead
-        self.pos_lb = jnp.array([-5, -5, 0.5]) # fight space dimensions: xyz
-        self.pos_ub = jnp.array([5, 5, 5])
-        self.vel_lb = jnp.array([-5, -5, -5])
-        self.vel_ub = jnp.array([5, 5, 5])
+        self.pos_lb = np.array([-5, -5, 0.5]) # fight space dimensions: xyz
+        self.pos_ub = np.array([5, 5, 5])
+        self.vel_lb = np.array([-5, -5, -5])
+        self.vel_ub = np.array([5, 5, 5])
 
-        self.action_lower_bounds = jnp.array([-30,0,0,0,0,0,0])
-        self.action_upper_bounds = jnp.array([0,2,2,2,2,0.5,0.5])
+        self.action_lower_bounds = np.array([-30,0,0,0,0,0,0])
+        self.action_upper_bounds = np.array([0,2,2,2,2,0.5,0.5])
         self.action_bounds_scale = 0.2
         self.action_lower_bounds_actual = self.action_lower_bounds + self.action_bounds_scale * self.action_upper_bounds
         self.action_upper_bounds_actual = (1 - self.action_bounds_scale) * self.action_upper_bounds
         
         # MujocoEnv
-        self.xa = jnp.zeros(3 * self.p.n_Wagner)
+        self.xa = np.zeros(3 * self.p.n_Wagner)
         self.model = mj.MjModel.from_xml_path(xml_file)
         self.data = mj.MjData(self.model)
         self.body_list = ["Base","L1","L2","L3","L4","L5","L6","L7",
@@ -114,7 +115,7 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         
         self.metadata = {
             "render_modes": ["human", "rgb_array", "depth_array"],
-            "render_fps": int(jnp.round(1.0 / self.dt)),
+            "render_fps": int(np.round(1.0 / self.dt)),
         }
         self.observation_structure = {
             "qpos": self.data.qpos.size,
@@ -140,7 +141,7 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         action = self.action_space.sample()
         print("Sample action: {}".format(action))
         print("Control range: {}".format(self.model.actuator_ctrlrange))
-        print("Actual control range: {}".format(jnp.vstack([self.action_lower_bounds_actual, self.action_upper_bounds_actual])))
+        print("Actual control range: {}".format(np.vstack([self.action_lower_bounds_actual, self.action_upper_bounds_actual])))
         print("Time step(dt): {}".format(self.dt))
         
     def _init_action_filter(self):
@@ -173,7 +174,7 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         self.time_in_sec = 0.0 # time
         self.reset_model()
         # use action
-        self.last_act   = jnp.zeros(self.n_action)
+        self.last_act   = np.zeros(self.n_action)
         self.reward     = None
         self.terminated = None
         self.info       = {}
@@ -210,7 +211,7 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         if self.timestep == 0: self.action_filter.init_history(action)
         # post-process action
         if self.lpf_action: action_filtered = self.action_filter.filter(action)
-        else: action_filtered = jnp.copy(action)
+        else: action_filtered = np.copy(action)
         # action_filtered[0] = 0
         action_filtered[0] = -29.8451302
 
@@ -230,8 +231,8 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         return obs, reward, terminated, truncated, self.info
     
     def do_simulation(self, ctrl, n_frames) -> None:
-        if jnp.array(ctrl).shape != (self.model.nu,):
-            raise ValueError(f"Action dimension mismatch. Expected {(self.model.nu,)}, found {jnp.array(ctrl).shape}")
+        if np.array(ctrl).shape != (self.model.nu,):
+            raise ValueError(f"Action dimension mismatch. Expected {(self.model.nu,)}, found {np.array(ctrl).shape}")
         self._step_mujoco_simulation(ctrl, n_frames)
 
     def _step_mujoco_simulation(self, ctrl, n_frames):
@@ -258,13 +259,13 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         qvel = self.data.qvel     
         N = len(qpos)
 
-        xd = jnp.zeros(22)
+        xd = np.zeros(22)
         xd[0] = qpos[self.posID_dic["L5"]]
         xd[1] = qpos[self.posID_dic["L6"]]
         if N == 21:
             xd[2:5] = qpos[0:3]
         else:
-            xd[2:5] = jnp.array([0,0,0.5])
+            xd[2:5] = np.array([0,0,0.5])
 
         xd[5] = qvel[self.jvelID_dic["L5"]]
         xd[6] = qvel[self.jvelID_dic["L6"]]
@@ -273,11 +274,11 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
             xd[7:10] = qvel[0:3]
             xd[10:13] = qvel[3:6]
         else:
-            xd[7:10] = jnp.zeros(3)
-            xd[10:13] = jnp.zeros(3)
+            xd[7:10] = np.zeros(3)
+            xd[10:13] = np.zeros(3)
 
         R_B = R_body(self.model, self.data)
-        xd[13:23] = jnp.transpose(R_B).flatten()
+        xd[13:23] = np.transpose(R_B).flatten()
         return xd, R_B
 
     def _update_data(self, step=True):
@@ -291,46 +292,46 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
             # self.reference_generator.update_ref_env(self.time_in_sec)
 
     def _get_reward(self, action_normalized):
-        names = ['position_error', 'velocity_error', 'angular_velocity', 'orientation_error', 'ijnput', 'delta_acs']
+        names = ['position_error', 'velocity_error', 'angular_velocity', 'orientation_error', 'input', 'delta_acs']
 
         w_position         = 5.0
         w_velocity         = 1.0
         w_angular_velocity = 5.0
         w_orientation      = 5.0
-        w_ijnput            = 20.0
+        w_input            = 20.0
         w_delta_act        = 0.1
 
-        reward_weights = jnp.array([w_position, w_velocity, w_angular_velocity, w_orientation, w_ijnput, w_delta_act])
-        weights = reward_weights / jnp.sum(reward_weights)  # weight can be adjusted later
+        reward_weights = np.array([w_position, w_velocity, w_angular_velocity, w_orientation, w_input, w_delta_act])
+        weights = reward_weights / np.sum(reward_weights)  # weight can be adjusted later
 
         scale_pos       = 1.0
         scale_vel       = 1.0
         scale_ang_vel   = 1.0
         scale_ori       = 1.0
-        scale_ijnput     = 1.0 # action already normalized
+        scale_input     = 1.0 # action already normalized
         scale_delta_act = 1.0
 
-        desired_pos_norm     = jnp.array([0.0, 0.0, 2.0]).reshape(3,1)/5 # x y z 
-        desired_vel_norm     = jnp.array([0.0, 0.0, 0.0]).reshape(3,1)/5 # vx vy vz
-        desired_ang_vel_norm = jnp.array([0.0, 0.0, 0.0]).reshape(3,1)/10 # \omega_x \omega_y \omega_z
-        desired_ori_norm     = jnp.array([0.0, 0.0, 0.0]).reshape(3,1)/jnp.pi # roll, pitch, yaw
+        desired_pos_norm     = np.array([0.0, 0.0, 2.0]).reshape(3,1)/5 # x y z 
+        desired_vel_norm     = np.array([0.0, 0.0, 0.0]).reshape(3,1)/5 # vx vy vz
+        desired_ang_vel_norm = np.array([0.0, 0.0, 0.0]).reshape(3,1)/10 # \omega_x \omega_y \omega_z
+        desired_ori_norm     = np.array([0.0, 0.0, 0.0]).reshape(3,1)/np.pi # roll, pitch, yaw
         
         obs = self._get_obs()
         current_pos_norm     = obs[0:3]/5 # [-5,5]
         current_vel_norm     = obs[7:10]/5 # [-5,5]
         current_ang_vel_norm = obs[10:13]/10 # [-10,10]
-        current_ori_norm     = quat2euler_raw(obs[3:7])/jnp.pi
+        current_ori_norm     = quat2euler_raw(obs[3:7])/np.pi
 
-        pos_err       = jnp.linalg.norm(current_pos_norm - desired_pos_norm)
-        vel_err       = jnp.linalg.norm(current_vel_norm - desired_vel_norm)
-        ang_vel_err   = jnp.linalg.norm(current_ang_vel_norm - desired_ang_vel_norm)
-        ori_err       = jnp.linalg.norm(current_ori_norm - desired_ori_norm)
-        ijnput_err     = jnp.linalg.norm(action_normalized) # It's not an error but let's just call it
-        delta_act_err = jnp.linalg.norm(action_normalized - self.last_act_norm) # It's not an error but let's just call it
+        pos_err       = np.linalg.norm(current_pos_norm - desired_pos_norm)
+        vel_err       = np.linalg.norm(current_vel_norm - desired_vel_norm)
+        ang_vel_err   = np.linalg.norm(current_ang_vel_norm - desired_ang_vel_norm)
+        ori_err       = np.linalg.norm(current_ori_norm - desired_ori_norm)
+        input_err     = np.linalg.norm(action_normalized) # It's not an error but let's just call it
+        delta_act_err = np.linalg.norm(action_normalized - self.last_act_norm) # It's not an error but let's just call it
 
-        rewards = jnp.exp(-jnp.array([scale_pos, scale_vel, scale_ang_vel, scale_ori, scale_ijnput, scale_delta_act]
-                         * jnp.array([pos_err, vel_err, ang_vel_err, ori_err, ijnput_err, delta_act_err])))
-        total_reward = jnp.sum(weights * rewards)
+        rewards = np.exp(-np.array([scale_pos, scale_vel, scale_ang_vel, scale_ori, scale_input, scale_delta_act]
+                         * np.array([pos_err, vel_err, ang_vel_err, ori_err, input_err, delta_act_err])))
+        total_reward = np.sum(weights * rewards)
         reward_dict = dict(zip(names, weights * rewards))
 
         return total_reward, reward_dict
@@ -380,59 +381,59 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
             self.max_timesteps = 0.5 * self.max_timesteps
 
             log = {
-                "t": jnp.empty((0, 1)),
-                "x": jnp.empty((0, 6)),
+                "t": np.empty((0, 1)),
+                "x": np.empty((0, 6)),
                 "xd": self.goal,
-                "u": jnp.empty((0, 3)),
+                "u": np.empty((0, 3)),
             }
             t = 0
-            log["x"] = jnp.append(
+            log["x"] = np.append(
                 log["x"],
-                jnp.array(
-                    [jnp.concatenate((self.estimator.pos(), self.estimator.vel()))]
+                np.array(
+                    [np.concatenate((self.estimator.pos(), self.estimator.vel()))]
                 ),
                 axis=0,
             )
-            log["t"] = jnp.append(log["t"], t)
+            log["t"] = np.append(log["t"], t)
             total_reward = 0
             for i in range(5000):
                 action, _state = model.predict(obs, deterministic=True)
                 obs, reward, terminated, info = self.step(action)
                 total_reward += reward
                 t = t + self.dt
-                log["x"] = jnp.append(
+                log["x"] = np.append(
                     log["x"],
-                    jnp.array(
-                        [jnp.concatenate((self.estimator.pos(), self.estimator.vel()))]
+                    np.array(
+                        [np.concatenate((self.estimator.pos(), self.estimator.vel()))]
                     ),
                     axis=0,
                 )
-                log["t"] = jnp.append(log["t"], t)
-                log["u"] = jnp.append(log["u"], jnp.array([self.last_act]), axis=0)
+                log["t"] = np.append(log["t"], t)
+                log["u"] = np.append(log["u"], np.array([self.last_act]), axis=0)
                 if terminated:
                     print(f"total reward: {total_reward}")
                     total_reward = 0
                     self.plot(log)
                     obs = self.reset()
                     log = {
-                        "t": jnp.empty((0, 1)),
-                        "x": jnp.empty((0, 6)),
+                        "t": np.empty((0, 1)),
+                        "x": np.empty((0, 6)),
                         "xd": self.goal,
-                        "u": jnp.empty((0, 3)),
+                        "u": np.empty((0, 3)),
                     }
                     t = 0
-                    log["x"] = jnp.append(
+                    log["x"] = np.append(
                         log["x"],
-                        jnp.array(
+                        np.array(
                             [
-                                jnp.concatenate(
+                                np.concatenate(
                                     (self.estimator.pos(), self.estimator.vel())
                                 )
                             ]
                         ),
                         axis=0,
                     )
-                    log["t"] = jnp.append(log["t"], t)
+                    log["t"] = np.append(log["t"], t)
             self.debug = False
             print(f"testing complete")
             self.plot(log)

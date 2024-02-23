@@ -1,5 +1,5 @@
 from __future__ import print_function
-import numpy as jnp
+import numpy as np
 from symbolic_functions.func_wing_kinematic import *
 from symbolic_functions.func_wing_tail import *
 from symbolic_functions.func_Mh import *
@@ -11,13 +11,13 @@ def func_eom(xk, xd, xa, u1, u_thruster, u_torque, p, yaw_damping):
     # u_thruster: f_thruster,  u_torque:t_torque
     w_body = xd[10:13]
     R_body = xd[13:22].reshape(3,3).T
-    pa = jnp.zeros((3,p.n_blade))
+    pa = np.zeros((3,p.n_blade))
     #aero_data = {'ua': ua, 'pa': pa, 'f_a': f_aero, 'aoa':aoa,'accel':accel}
 
     # kinematic EOM: Ak*accel + hk = uk
     
     Ak, hk, uk = func_wing_kinematic(xk, u1, p.wing_conformation.flatten())
-    ak = (jnp.linalg.lstsq(Ak.astype('float64'), (uk.astype('float') - hk.astype('float')), rcond=None))[0]
+    ak = (np.linalg.lstsq(Ak.astype('float64'), (uk.astype('float') - hk.astype('float')), rcond=None))[0]
     
     # Determine fk = [vel ; accel]
     fk       = xk * 0
@@ -40,19 +40,19 @@ def func_eom(xk, xd, xa, u1, u_thruster, u_torque, p, yaw_damping):
     # calculate blade element inertial position, velocities, and Ba(mapping for generalized forces)
     #----------------------------------------------------------------------------------------------
     # Ba is the inertial force to generalized force transformation matrix for calculating ua
-    pos_s      = jnp.zeros((3,p.n_blade))    # inertial position
-    vel_s      = jnp.zeros((3,p.n_blade))    # inertial velocity
-    Ba_s       = jnp.zeros((8,3, p.n_blade)) #  ua = Ba * fa, fa = inertial aero force
-    vel_s_surf = jnp.zeros((3,p.n_blade))    # velocity about the wing axis[front, left, normal]
-    e_n        = jnp.zeros((3,p.n_blade))    # wing's surface normal direction
-    aoa        = jnp.zeros((1,p.n_blade))    # angle of attack(free stream)
-    aoa_d      = jnp.zeros(p.n_blade,)        # change in angle of attack due to downwash
-    U          = jnp.zeros(p.n_blade,)        # effective air speed
-    e_effvel   = jnp.zeros((3, p.n_blade))    # (3,18)
-    pos        = jnp.zeros((3,1))
-    vel        = jnp.zeros((3,1))
-    Ba         = jnp.zeros((8,3))
-    Rw         = jnp.zeros((3,3))
+    pos_s      = np.zeros((3,p.n_blade))    # inertial position
+    vel_s      = np.zeros((3,p.n_blade))    # inertial velocity
+    Ba_s       = np.zeros((8,3, p.n_blade)) #  ua = Ba * fa, fa = inertial aero force
+    vel_s_surf = np.zeros((3,p.n_blade))    # velocity about the wing axis[front, left, normal]
+    e_n        = np.zeros((3,p.n_blade))    # wing's surface normal direction
+    aoa        = np.zeros((1,p.n_blade))    # angle of attack(free stream)
+    aoa_d      = np.zeros(p.n_blade,)        # change in angle of attack due to downwash
+    U          = np.zeros(p.n_blade,)        # effective air speed
+    e_effvel   = np.zeros((3, p.n_blade))    # (3,18)
+    pos        = np.zeros((3,1))
+    vel        = np.zeros((3,1))
+    Ba         = np.zeros((8,3))
+    Rw         = np.zeros((3,3))
 
    
     for i in range (p.n_blade):
@@ -71,28 +71,28 @@ def func_eom(xk, xd, xa, u1, u_thruster, u_torque, p, yaw_damping):
             Rw = rot_x(-xd[1])
         elif p.strip_id[i] == 5:
             pos, vel, Ba = func_tail(xd, p.strip_dc[0:3,i])
-            Rw = jnp.eye(3)
+            Rw = np.eye(3)
 
  
         # Wing velocities about wing segment's axis [front, left, normal]
         # Local effective velocity(wing frame)
         vel_surf = (Rw.T) @ (R_body.T) @ (vel - p.airspeed)
-        vel_surf_norm = jnp.linalg.norm(vel_surf, 2) # Air velocity magnitude
+        vel_surf_norm = np.linalg.norm(vel_surf, 2) # Air velocity magnitude
         # print(vel_surf_norm)
 
         # Effective velocity direction(x, z)
-        if jnp.linalg.norm(vel_surf.flatten().take([0,2])) < 1e-6:
-            ev = jnp.zeros(3,1) # Prevent dividing by zero
+        if np.linalg.norm(vel_surf.flatten().take([0,2])) < 1e-6:
+            ev = np.zeros(3,1) # Prevent dividing by zero
         else:
-            ev = vel_surf / jnp.linalg.norm(vel_surf, 2) # Unit vector of air flow direction
-        alpha_inf = jnp.arctan2(-vel_surf[2], vel_surf[0]) # Angle of attack
+            ev = vel_surf / np.linalg.norm(vel_surf, 2) # Unit vector of air flow direction
+        alpha_inf = np.arctan2(-vel_surf[2], vel_surf[0]) # Angle of attack
         
         # Record values
         pos_s[:, i] = pos.flatten()
         vel_s[:, i] = vel.flatten() - p.airspeed.flatten()
         vel_s_surf[:, i] = vel_surf.flatten()
         Ba_s[:,:, i] = Ba
-        e_n[:, i] = R_body @ Rw @ jnp.array([0,0,1]).reshape(3,1).flatten()
+        e_n[:, i] = R_body @ Rw @ np.array([0,0,1]).reshape(3,1).flatten()
         aoa[:, i] = alpha_inf
         e_effvel[:, i] = ev.flatten()
         if vel_surf_norm < 1e-4:
@@ -105,15 +105,15 @@ def func_eom(xk, xd, xa, u1, u_thruster, u_torque, p, yaw_damping):
 
     if(p.flag_use_wagnermodel):
 
-        An = jnp.zeros((nWagner, nWagner))
+        An = np.zeros((nWagner, nWagner))
         a0 = p.a0
         c0 = p.c0
-        n  = jnp.arange(1, nWagner+1)
+        n  = np.arange(1, nWagner+1)
         for i in range(nWagner):
-            An[i,:] = a0 * c0 / U[i] * jnp.sin(n * p.strip_theta[i])
+            An[i,:] = a0 * c0 / U[i] * np.sin(n * p.strip_theta[i])
         
         an = xa_m[:,0]
-        bn = jnp.zeros((nWagner, 1))
+        bn = np.zeros((nWagner, 1))
        
         for i in range(nWagner):
 
@@ -121,29 +121,29 @@ def func_eom(xk, xd, xa, u1, u_thruster, u_torque, p, yaw_damping):
             z1 = xa_m[i, 1]
             z2 = xa_m[i, 2]
             # Downwash due to vortex
-            wy = -a0 * c0 * U[i] / 4 / p.span_max * (n * jnp.sin(n * p.strip_theta[i])) / jnp.sin(p.strip_theta[i]) @ an
+            wy = -a0 * c0 * U[i] / 4 / p.span_max * (n * np.sin(n * p.strip_theta[i])) / np.sin(p.strip_theta[i]) @ an
             wn = vel_s_surf[2, i]
             w  = wn + wy
             # print(w)
             
             # vel_surf = (Rw.T).dot(R_body.T).dot(vel.reshape(3,1) - p.airspeed.reshape(3,1))
             aoa = aoa.reshape(18,1)
-            alpha_downwash = jnp.arctan2(-w, vel_surf[0]) - aoa[i]
+            alpha_downwash = np.arctan2(-w, vel_surf[0]) - aoa[i]
             aoa_d[i] = alpha_downwash
 
-            bn[i]      = -a0 * c0 / p.strip_c[i] * (jnp.sin(n * p.strip_theta[i])) @ an + a0 *(w * p.Phi_0 / U[i] + p.phi_a[0] * p.phi_b[0] / (p.strip_c[i] / 2) * z1 + p.phi_a[1] * p.phi_b[1] * z2)
+            bn[i]      = -a0 * c0 / p.strip_c[i] * (np.sin(n * p.strip_theta[i])) @ an + a0 *(w * p.Phi_0 / U[i] + p.phi_a[0] * p.phi_b[0] / (p.strip_c[i] / 2) * z1 + p.phi_a[1] * p.phi_b[1] * z2)
             fa_m[i, 1] = U[i] * wn + p.phi_b[0] / (p.strip_c[i] / 2) * z1
             fa_m[i, 2] = U[i] * wy + p.phi_b[1] / (p.strip_c[i] / 2) * z2
         
         # Calculate aerodynamic states rate of change for an
-        fa_m[:,0] = jnp.linalg.lstsq(An.astype('float32'), bn.astype('float32'), rcond=None)[0].flatten()
+        fa_m[:,0] = np.linalg.lstsq(An.astype('float32'), bn.astype('float32'), rcond=None)[0].flatten()
         fa        = fa_m[:].T.flatten()
     else:
         fa = xa * 0
 
     # Calculate aerodynamics lift and drag
-    pa     = jnp.zeros((3, p.n_blade))
-    f_aero = jnp.zeros((3, p.n_blade))
+    pa     = np.zeros((3, p.n_blade))
+    f_aero = np.zeros((3, p.n_blade))
 
     for i in range(p.n_blade):
         if p.strip_id[i] == 1 or p.strip_id[i] == 3:
@@ -163,12 +163,12 @@ def func_eom(xk, xd, xa, u1, u_thruster, u_torque, p, yaw_damping):
         elif p.strip_id[i] == 4: # rR
             Rw = rot_x(-xd[1])
         elif p.strip_id[i] == 5: # tail
-            Rw = jnp.eye(3)
+            Rw = np.eye(3)
 
         # Lift coefficient(wagner for the wing, if enabled)
         if (i < nWagner) and p.flag_use_wagnermodel:
-            Gamma  = 0.5 * a0 * c0 * U[i] * jnp.sin(n * p.strip_theta[i]) @ an
-            C_lift = -a0 * jnp.sin(n * p.strip_theta[i]) @ (an + p.strip_c[i] / U[i] * fa_m[:, 0])
+            Gamma  = 0.5 * a0 * c0 * U[i] * np.sin(n * p.strip_theta[i]) @ an
+            C_lift = -a0 * np.sin(n * p.strip_theta[i]) @ (an + p.strip_c[i] / U[i] * fa_m[:, 0])
         else:
             # Quasi - steady model
             Gamma  = 0
@@ -177,7 +177,7 @@ def func_eom(xk, xd, xa, u1, u_thruster, u_torque, p, yaw_damping):
         # Drag coefficient(quasi - steady)
         aoa    = aoa.flatten()
         C_drag = drag_coeff(aoa[i], p.aero_model_drag)
-        e_lift = jnp.cross(e_effvel[:, i].flatten(), jnp.array([0,1,0])) 
+        e_lift = np.cross(e_effvel[:, i].flatten(), np.array([0,1,0])) 
         e_drag = (-e_effvel[:, i]).flatten()  # (3,1)
         lift   = p.air_density / 2 * U[i]**2 * C_lift * delta_span * p.strip_c[i] * e_lift
         drag   = p.air_density / 2 * U[i]**2 * C_drag * delta_span * p.strip_c[i] * e_drag
@@ -192,59 +192,59 @@ def func_eom(xk, xd, xa, u1, u_thruster, u_torque, p, yaw_damping):
     # Apply joint constraints
     uj = fk[10:12] # Joint acceleration constraint from kinematics
 
-    Jc = jnp.concatenate((jnp.eye(2), jnp.zeros((2,6))),axis=1)  # Constraint jacobian
+    Jc = np.concatenate((np.eye(2), np.zeros((2,6))),axis=1)  # Constraint jacobian
 
     ut = hd * 0
     for i in range(p.N_thruster):
         ut = ut + func_genforce_body(xd, p.d_thruster[:,i], u_thruster[:,i])
 
     for i in range(p.N_thruster):
-        ut = ut + ((jnp.concatenate([jnp.zeros((3,5)), jnp.eye(3)], axis=1)).T @ (u_torque[:,i].reshape(3,1))).reshape(8,1)
+        ut = ut + ((np.concatenate([np.zeros((3,5)), np.eye(3)], axis=1)).T @ (u_torque[:,i].reshape(3,1))).reshape(8,1)
 
-    ut = ut + (jnp.concatenate((jnp.zeros((3,5)), jnp.eye(3)), axis=1)).T @ (yaw_damping.reshape(3,1))
+    ut = ut + (np.concatenate((np.zeros((3,5)), np.eye(3)), axis=1)).T @ (yaw_damping.reshape(3,1))
     ut = ut.astype('float64')
-    u_a_t_d = jnp.array([ua + ut - hd]).reshape(8,1)
+    u_a_t_d = np.array([ua + ut - hd]).reshape(8,1)
     
     u_j = uj.reshape(2,1)
 
-    hc = jnp.concatenate((u_a_t_d, u_j), axis=0)
+    hc = np.concatenate((u_a_t_d, u_j), axis=0)
     hc = hc.astype('float64')
     
     # Optional: add other states constraints
     if p.flag_constraint_dynamics == 1:
         # Constraint lateral movements, roll, and yaw
-        Jc      = jnp.concatenate((Jc, jnp.concatenate((jnp.zeros((2,5)), jnp.array([[1,0,0],[0,0,1]])), axis=1)), axis=0)
-        im_eye5 = jnp.concatenate((jnp.zeros((2,2)), jnp.eye(2)), axis=1)
-        im_eye6 = jnp.concatenate((im_eye5, jnp.zeros((2,4))), axis=1)
-        Jc      = jnp.concatenate((Jc,im_eye6), axis=0)       #(6,8)
-        hc      = jnp.concatenate((hc, jnp.zeros((4,1))), axis=0).reshape(10,1)
+        Jc      = np.concatenate((Jc, np.concatenate((np.zeros((2,5)), np.array([[1,0,0],[0,0,1]])), axis=1)), axis=0)
+        im_eye5 = np.concatenate((np.zeros((2,2)), np.eye(2)), axis=1)
+        im_eye6 = np.concatenate((im_eye5, np.zeros((2,4))), axis=1)
+        Jc      = np.concatenate((Jc,im_eye6), axis=0)       #(6,8)
+        hc      = np.concatenate((hc, np.zeros((4,1))), axis=0).reshape(10,1)
 
     elif p.flag_constraint_dynamics == 2:
-        Jc      = jnp.concatenate((Jc, jnp.concatenate(jnp.zeros((6,2), jnp.eye(6)), axis=1)), axis=0)
-        hc      = jnp.concatenate((hc, jnp.zeros((6,1))), axis=0).reshape(10,1)
+        Jc      = np.concatenate((Jc, np.concatenate(np.zeros((6,2), np.eye(6)), axis=1)), axis=0)
+        hc      = np.concatenate((hc, np.zeros((6,1))), axis=0).reshape(10,1)
 
     elif p.flag_constraint_dynamics == 3:
-        Jc      = jnp.concatenate((Jc, jnp.concatenate((jnp.zeros((3,5)), jnp.eye(3)), axis=1)), axis=0)
-        hc      = jnp.concatenate((hc, jnp.zeros((3,1))), axis=0).reshape(10,1)
+        Jc      = np.concatenate((Jc, np.concatenate((np.zeros((3,5)), np.eye(3)), axis=1)), axis=0)
+        hc      = np.concatenate((hc, np.zeros((3,1))), axis=0).reshape(10,1)
 
     elif p.flag_constraint_dynamics == 4:
-        im_eye1 = jnp.concatenate((jnp.zeros((3,2)), jnp.eye(3)), axis=1)
-        im_eye2 = jnp.concatenate((im_eye1, jnp.zeros((3,3))), axis=1)
-        Jc      = jnp.concatenate((Jc, im_eye2), axis=0)
-        hc      = jnp.concatenate((hc, jnp.zeros((3,1))), axis=0).reshape(10,1)
+        im_eye1 = np.concatenate((np.zeros((3,2)), np.eye(3)), axis=1)
+        im_eye2 = np.concatenate((im_eye1, np.zeros((3,3))), axis=1)
+        Jc      = np.concatenate((Jc, im_eye2), axis=0)
+        hc      = np.concatenate((hc, np.zeros((3,1))), axis=0).reshape(10,1)
 
     elif p.flag_constraint_dynamics == 5:
-        im_eye3 = jnp.concatenate((jnp.zeros((2,2)), jnp.eye(2)), axis=1)
-        im_eye4 = jnp.concatenate((im_eye3, jnp.zeros((2,4))), axis=1)
-        Jc      = jnp.concatenate((Jc, im_eye4), axis=0)
-        Jc      = jnp.concatenate((Jc, jnp.concatenate((jnp.zeros((3,5)), jnp.eye(3)), axis=1)), axis=0)
-        hc      = jnp.concatenate((hc, jnp.zeros((5,1))), axis=0)
+        im_eye3 = np.concatenate((np.zeros((2,2)), np.eye(2)), axis=1)
+        im_eye4 = np.concatenate((im_eye3, np.zeros((2,4))), axis=1)
+        Jc      = np.concatenate((Jc, im_eye4), axis=0)
+        Jc      = np.concatenate((Jc, np.concatenate((np.zeros((3,5)), np.eye(3)), axis=1)), axis=0)
+        hc      = np.concatenate((hc, np.zeros((5,1))), axis=0)
 
     n_jc     = len(Jc[:, 0])
-    Md_jc    = jnp.concatenate((Md,-Jc.T),axis=1)
-    Jc_zeros = jnp.concatenate((Jc,jnp.zeros((n_jc, n_jc))),axis=1)
-    Mc       = jnp.concatenate((Md_jc, Jc_zeros),axis=0)
-    temp     = (jnp.linalg.lstsq(Mc, hc, rcond=None))[0]
+    Md_jc    = np.concatenate((Md,-Jc.T),axis=1)
+    Jc_zeros = np.concatenate((Jc,np.zeros((n_jc, n_jc))),axis=1)
+    Mc       = np.concatenate((Md_jc, Jc_zeros),axis=0)
+    temp     = (np.linalg.lstsq(Mc, hc, rcond=None))[0]
     accel    = temp[0:8]
     lambda_  = temp[8:]
     R_body_D = R_body.dot(skew(w_body))
@@ -262,8 +262,8 @@ def func_eom(xk, xd, xa, u1, u_thruster, u_torque, p, yaw_damping):
 def strip_states(i, pw, xd, p):
 
     # Returns strip plunge position and pitch angle, with their velocities.
-    q = jnp.array([0,0]).reshape(2,1)
-    dq =jnp.array([0,0]).reshape(2,1)
+    q = np.array([0,0]).reshape(2,1)
+    dq =np.array([0,0]).reshape(2,1)
     # Calculate inertial position and velocity
 
     if i <= p.n_blade_prox:
@@ -285,16 +285,16 @@ def strip_states(i, pw, xd, p):
 
     # Calculate pitch angle(angle of attack?)
     Rb_T = Rb.T
-    pitch = jnp.asin(-Rb_T[0, 2])
+    pitch = np.asin(-Rb_T[0, 2])
 
     # Calculate plunge, pitch, and their rates
-    q = jnp.array([pos_body[2],pitch]).reshape(2,1)
-    dq = jnp.array([vel_body[2],xd[11]]).reshape(2,1)
+    q = np.array([pos_body[2],pitch]).reshape(2,1)
+    dq = np.array([vel_body[2],xd[11]]).reshape(2,1)
 
     return q, dq, Ba
 
 def func_wing_surface_pos(id, s, pos_wing, x_pitch):
-    # Ijnputs:
+    # Inputs:
     # id = wing id, id = 1: LH, 2: LR, 3: RH, 4: RR
     # s = unitless span position
     # pos_wing = wing vertices, in wing frame
@@ -311,23 +311,23 @@ def func_wing_surface_pos(id, s, pos_wing, x_pitch):
 
     if id == 1:
         # Left humerus wing
-        id_f = jnp.array([2, 1]).reshape(1,2)# Front side index
-        id_r = jnp.array([3, 4, 0]).reshape(1,3) # Rear side index
+        id_f = np.array([2, 1]).reshape(1,2)# Front side index
+        id_r = np.array([3, 4, 0]).reshape(1,3) # Rear side index
         pos_temp = pos_wing_hL
     elif id == 2:
         # Left radius wing
-        id_f = jnp.array([0, 5, 4]).reshape(1,3)# Front side index
-        id_r = jnp.array([1, 2, 3, 4]).reshape(1,4) # Rear side index
+        id_f = np.array([0, 5, 4]).reshape(1,3)# Front side index
+        id_r = np.array([1, 2, 3, 4]).reshape(1,4) # Rear side index
         pos_temp = pos_wing_rL
     elif id == 3:
         # Right humerus wing
-        id_f = jnp.array([1, 2]).reshape(1,2) # Front side index
-        id_r = jnp.array([0, 4, 3]).reshape(1,3) # Rear side index
+        id_f = np.array([1, 2]).reshape(1,2) # Front side index
+        id_r = np.array([0, 4, 3]).reshape(1,3) # Rear side index
         pos_temp = pos_wing_hR
     elif id == 4:
         # Right radius wing
-        id_f = jnp.array([4, 5, 0]).reshape(1,3) # Front side index
-        id_r = jnp.array([4, 3, 2, 1]).reshape(1,4) # Rear side index
+        id_f = np.array([4, 5, 0]).reshape(1,3) # Front side index
+        id_r = np.array([4, 3, 2, 1]).reshape(1,4) # Rear side index
         pos_temp = pos_wing_rR
 
     # Determine chord length at the specific wingspan
@@ -336,7 +336,7 @@ def func_wing_surface_pos(id, s, pos_wing, x_pitch):
     xf, xr = interp_wingpos(pos_temp[:, id_f], pos_temp[:, id_r], pos_span)
 
     # Outputs
-    pw = jnp.array([x_pitch,pos_span]).reshape(2,1) # Position of the pitch axis and span on the wing local frame
+    pw = np.array([x_pitch,pos_span]).reshape(2,1) # Position of the pitch axis and span on the wing local frame
     c = xf - xr # Strip chord length
     xe = (xf + xr) / 2 - x_pitch # Pitch axis relative to the chord center
 
@@ -357,9 +357,9 @@ def interp_wingpos(xf, xr, y):
     return qf, qr
 
 def lift_coeff(a, params):
-    c = params[0]+ params[1] * jnp.sin(jnp.radians(params[2] * jnp.degrees(a) + params[3]))
+    c = params[0]+ params[1] * np.sin(np.radians(params[2] * np.degrees(a) + params[3]))
     return c
 
 def drag_coeff(a, params):
-    c = params[0] + params[1] * jnp.cos(jnp.radians(params[2] * jnp.degrees(a) + params[3]))
+    c = params[0] + params[1] * np.cos(np.radians(params[2] * np.degrees(a) + params[3]))
     return c

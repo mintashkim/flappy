@@ -1,5 +1,5 @@
-import math
 import numpy as np
+from numpy import sin, cos
 from scipy.spatial.transform import Rotation
 
 
@@ -56,12 +56,12 @@ def euler2quat_raw(rpy):
 
     roll, pitch, yaw = rpy
 
-    cy = math.cos(yaw * 0.5)
-    sy = math.sin(yaw * 0.5)
-    cp = math.cos(pitch * 0.5)
-    sp = math.sin(pitch * 0.5)
-    cr = math.cos(roll * 0.5)
-    sr = math.sin(roll * 0.5)
+    cy = cos(yaw * 0.5)
+    sy = sin(yaw * 0.5)
+    cp = cos(pitch * 0.5)
+    sp = sin(pitch * 0.5)
+    cr = cos(roll * 0.5)
+    sr = sin(roll * 0.5)
 
     w = cr * cp * cy + sr * sp * sy
     x = sr * cp * cy - cr * sp * sy
@@ -88,7 +88,7 @@ def quat2euler_raw(quat):
 
     sinp = 2.0 * (w * y - z * x)
     if abs(sinp) >= 1.0:
-        pitch = np.copysign(math.pi*0.5, sinp)     # use 90 degrees if out of range
+        pitch = np.copysign(np.pi*0.5, sinp)     # use 90 degrees if out of range
     else:
         pitch = np.arcsin(sinp)
 
