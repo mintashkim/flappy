@@ -1,5 +1,7 @@
 import numpy as np
 from numba import jit
+# import jax.numpy as jnp
+# from jax import jit
 import sys, os
 sys.path.append('/Users/mintaekim/Desktop/HRL/Flappy/Integrated/Flappy_Integrated/flappy_v2/envs')
 sys.path.append('/Users/mintaekim/Desktop/HRL/Flappy/Integrated/Flappy_Integrated/flappy_v2')
