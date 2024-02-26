@@ -34,7 +34,8 @@ model = PPO('MlpPolicy',
             clip_range=0.2,
             verbose=1,
             policy_kwargs={'net_arch':net_arch},
-            tensorboard_log=log_path)
+            tensorboard_log=log_path,
+            device='mps')
 
 model.learn(total_timesteps=1e+7, # The total number of samples (env steps) to train on
             progress_bar=True,
