@@ -32,6 +32,7 @@ model = PPO('MlpPolicy',
             gamma=0.98,  # 0.99 # look forward 1.65s
             gae_lambda=0.95,
             clip_range=0.2,
+            ent_coef=0.01, # Makes PPO explore
             verbose=1,
             policy_kwargs={'net_arch':net_arch},
             tensorboard_log=log_path,
