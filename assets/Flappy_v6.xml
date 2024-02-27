@@ -1,7 +1,7 @@
 <mujoco model="Flappy_v6">
   <compiler angle="radian" meshdir="meshes/" balanceinertia="true" />
   <!-- <statistic meansize="0.0652069" extent="0.541984" center="0.0122683 -0.0367867 0.0356997"/> -->
-  <option impratio="1" timestep="2e-5" gravity="0 0 -9.81" integrator="implicitfast"  density="1.225" viscosity="1.789e-5" wind="0 0 0">
+  <option impratio="1" gravity="0 0 -9.81" integrator="implicitfast"  density="1.225" viscosity="1.789e-5" wind="0 0 0">
   <!-- <option impratio="1" gravity="0 0 -9.81"  integrator="implicit" density="1.225" viscosity="1.789e-5"  wind="-16.5 0 0.5"> Uncomment this to enable aerodynamics -->
 <!--  <option impratio="1" gravity="0 0 -9.81"  integrator="implicit" > Uncomment this to disable aerodynamics-->
 <!--    <flag contact="disable"/>-->

@@ -31,7 +31,7 @@ from rotation_transformations import *
 from R_body import R_body
 
 
-DEFAULT_CAMERA_CONFIG = {"trackbodyid": 0, "distance": 10.0}
+DEFAULT_CAMERA_CONFIG = {"trackbodyid": 0, "distance": 12.0}
 TRAJECTORY_TYPES = {"linear": 0, "circular": 1, "setpoint": 2}
 
 class FlappyEnv(MujocoEnv, utils.EzPickle):
@@ -73,7 +73,8 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         self.traj_type          = traj_type
         self.noisy              = False
         self.randomize_dynamics = False # True to randomize dynamics
-        self.lpf_action         = lpf_action # Low Pass Filter 
+        self.lpf_action         = lpf_action # Low Pass Filter
+        self.is_aero            = False
 
         # Observation, need to be reduce later for smoothness
         self.n_state            = 84 # NOTE: change to the number of states *we can measure*
@@ -95,7 +96,7 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
 
         self.action_lower_bounds = np.array([-30,0,0,0,0,0,0])
         self.action_upper_bounds = np.array([0,2,2,2,2,0.5,0.5])
-        self.action_bounds_scale = 0.2
+        self.action_bounds_scale = 0.0
         self.action_lower_bounds_actual = self.action_lower_bounds + self.action_bounds_scale * self.action_upper_bounds
         self.action_upper_bounds_actual = (1 - self.action_bounds_scale) * self.action_upper_bounds
         
@@ -129,12 +130,11 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         self._seed()
         self.reset()
         self._init_env()
-        
 
     @property
     def dt(self) -> float:
-        return self.model.opt.timestep * self.frame_skip
-        # return 2e-5
+        if self.is_aero: return 2e-5 * self.frame_skip
+        else: return self.model.opt.timestep * self.frame_skip
 
     def _init_env(self):
         print("Environment created")
@@ -212,16 +212,15 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         # post-process action
         if self.lpf_action: action_filtered = self.action_filter.filter(action)
         else: action_filtered = np.copy(action)
-        # action_filtered[0] = 0
-        action_filtered[0] = -29.8451302
+        action_filtered[0] = 0
+        # action_filtered[0] = -29.8451302
 
         self.do_simulation(action_filtered, self.frame_skip)
         obs = self._get_obs()
         reward, reward_dict = self._get_reward(action_normalized)
         self.info["reward_dict"] = reward_dict
 
-        if self.render_mode == "human":
-            self.render()
+        if self.render_mode == "human": self.render()
 
         self._update_data(step=True)
         self.last_act_norm = action_normalized
@@ -236,10 +235,10 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         self._step_mujoco_simulation(ctrl, n_frames)
 
     def _step_mujoco_simulation(self, ctrl, n_frames):
-        for _ in range(self.num_sims_per_env_step):
-            self.data.ctrl[:] = ctrl
+        self.data.ctrl[:] = ctrl
 
-            # NOTE: For aero()
+        # NOTE: Custom Aero
+        if self.is_aero:
             self.xd, R_body = self._get_original_states()
             fa, ua, self.xd = aero(self.model, self.data, self.xa, self.xd, R_body)
             # Apply Aero forces
@@ -249,8 +248,8 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
             # Integrate Aero States
             self.xa = self.xa + fa * self.dt
 
-            mj.mj_step(self.model, self.data, nstep=n_frames)
-            mj.mj_rnePostConstraint(self.model, self.data)
+        mj.mj_step(self.model, self.data, nstep=n_frames)
+        mj.mj_rnePostConstraint(self.model, self.data)
 
     # NOTE: For aero()
     def _get_original_states(self):
