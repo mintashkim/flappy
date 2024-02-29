@@ -10,7 +10,7 @@ from envs.flappy_env import FlappyEnv
 
 
 log_path = os.path.join('logs')
-save_path = os.path.join('saved_models')
+save_path = os.path.join('saved_models_flap')
 env = FlappyEnv(render_mode="human")
 env = VecMonitor(DummyVecEnv([lambda: env]))
 

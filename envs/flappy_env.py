@@ -89,10 +89,10 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         self.observation_space  = Box(low=-np.inf, high=np.inf, shape=(13,)) # NOTE: change to the actual number of obs to actor policy
 
         # NOTE: the low & high does not actually limit the actions output from MLP network, manually clip instead
-        self.pos_lb = np.array([-5, -5, 0.5]) # fight space dimensions: xyz
-        self.pos_ub = np.array([5, 5, 5])
-        self.vel_lb = np.array([-5, -5, -5])
-        self.vel_ub = np.array([5, 5, 5])
+        self.pos_lb = np.array([-5,-5,0.5]) # fight space dimensions: xyz
+        self.pos_ub = np.array([5,5,5])
+        self.vel_lb = np.array([-5,-5,-5])*10
+        self.vel_ub = np.array([5,5,5])*10
 
         self.action_lower_bounds = np.array([-30,0,0,0,0,0,0])
         self.action_upper_bounds = np.array([0,2,2,2,2,0.5,0.5])
@@ -242,9 +242,12 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
             self.xd, R_body = self._get_original_states()
             fa, ua, self.xd = aero(self.model, self.data, self.xa, self.xd, R_body)
             # Apply Aero forces
-            self.data.qfrc_applied[self.jvelID_dic["L5"]] = ua[0]
-            self.data.qfrc_applied[self.jvelID_dic["L6"]] = ua[1]
-            self.data.qfrc_applied[0:6] = ua[2:8]
+            # self.data.qfrc_applied[self.jvelID_dic["L5"]] = ua[0]
+            # self.data.qfrc_applied[self.jvelID_dic["L6"]] = ua[1]
+            # self.data.qfrc_applied[0:6] = ua[2:8]
+            self.data.qfrc_applied[self.jvelID_dic["L3"]] = ua[0]
+            self.data.qfrc_applied[self.jvelID_dic["L7"]] = ua[1]
+            self.data.xfrc_applied[self.bodyID_dic["Base"]] = [*ua[2:5], *ua[5:8]]
             # Integrate Aero States
             self.xa = self.xa + fa * self.dt
 
