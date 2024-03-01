@@ -4,8 +4,8 @@ Reinforcement Learning for Robust Locomotion Control of Flapping Wing MAV
 
 ## Description
 
-* Hard Coded Version: MujocoEnv, [Gymnasium](https://github.com/Farama-Foundation/Gymnasium), and [Stable-Baselines3](https://github.com/DLR-RM/stable-baselines3) are used
-* Mujoco built-in fluid dynamics is used
+* Hard Coded Version: [Gymnasium](https://github.com/Farama-Foundation/Gymnasium), and [Stable-Baselines3](https://github.com/DLR-RM/stable-baselines3) are used
+* Custom fluid dynamics is used
 
 ## Getting Started
 
@@ -34,9 +34,7 @@ python run.py
 
 ## Authors
 
-Mintae Kim  
-Jiaze Cai  
-Jack Leckert
+Mintae Kim
 
 ## Version History
 
