@@ -46,7 +46,8 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         lpf_action    = True,
         traj_type     = False,
         # MujocoEnv
-        xml_file: str = "../assets/Flappy_v8.xml",
+        # xml_file: str = "../assets/Flappy_v8_FixedAxis.xml",
+        xml_file: str = "../assets/Flappy_v8_Base.xml",
         frame_skip: int = 2,
         default_camera_config: Dict[str, Union[float, int]] = DEFAULT_CAMERA_CONFIG,
         reset_noise_scale: float = 0.01,
@@ -74,7 +75,7 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         self.noisy              = False
         self.randomize_dynamics = False # True to randomize dynamics
         self.lpf_action         = lpf_action # Low Pass Filter
-        self.is_aero            = False
+        self.is_aero            = True
 
         # Observation, need to be reduce later for smoothness
         self.n_state            = 84 # NOTE: change to the number of states *we can measure*
@@ -91,17 +92,18 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         # NOTE: the low & high does not actually limit the actions output from MLP network, manually clip instead
         self.pos_lb = np.array([-5,-5,0.5]) # fight space dimensions: xyz
         self.pos_ub = np.array([5,5,5])
-        self.vel_lb = np.array([-5,-5,-5])*10
-        self.vel_ub = np.array([5,5,5])*10
+        self.speed_bound = 100.0
 
         self.action_lower_bounds = np.array([-30,0,0,0,0,0,0])
-        self.action_upper_bounds = np.array([0,2,2,2,2,0.5,0.5])
+        self.action_upper_bounds = np.array([0,1,1,1,1,0.5,0.5])
         self.action_bounds_scale = 0.0
-        self.action_lower_bounds_actual = self.action_lower_bounds + self.action_bounds_scale * self.action_upper_bounds
-        self.action_upper_bounds_actual = (1 - self.action_bounds_scale) * self.action_upper_bounds
-        
-        # MujocoEnv
+        self.action_lower_bounds_actual = np.concatenate([self.action_lower_bounds[0:5] + self.action_bounds_scale * self.action_upper_bounds[0:5], 
+                                                          self.action_lower_bounds[5:7]])
+        self.action_upper_bounds_actual = np.concatenate([(1 - self.action_bounds_scale) * self.action_upper_bounds[0:5],
+                                                          self.action_upper_bounds[5:7]])
         self.xa = np.zeros(3 * self.p.n_Wagner)
+
+        # MujocoEnv
         self.model = mj.MjModel.from_xml_path(xml_file)
         self.data = mj.MjData(self.model)
         self.body_list = ["Base","L1","L2","L3","L4","L5","L6","L7",
@@ -116,7 +118,7 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         
         self.metadata = {
             "render_modes": ["human", "rgb_array", "depth_array"],
-            "render_fps": int(np.round(1.0 / self.dt)),
+            "render_fps": int(np.round(1.0 / self.dt))
         }
         self.observation_structure = {
             "qpos": self.data.qpos.size,
@@ -132,9 +134,10 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         self._init_env()
 
     @property
-    def dt(self) -> float:
-        if self.is_aero: return 2e-5 * self.frame_skip
-        else: return self.model.opt.timestep * self.frame_skip
+    def dt(self):
+        # if self.is_aero: return 2e-5 * self.frame_skip
+        # else: return self.model.opt.timestep * self.frame_skip
+        return 2e-5
 
     def _init_env(self):
         print("Environment created")
@@ -199,6 +202,7 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         if self.randomize_dynamics:
             self.sim.set_dynamics()
 
+    # TODO: Extract pos, vel, ori, ang_vel from xa xk xd
     def _get_obs(self):
         return self.data.sensordata
 
@@ -212,10 +216,10 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         # post-process action
         if self.lpf_action: action_filtered = self.action_filter.filter(action)
         else: action_filtered = np.copy(action)
-        action_filtered[0] = 0
-        # action_filtered[0] = -29.8451302
+        
+        for _ in range(self.num_sims_per_env_step):
+            self.sim.step(action_filtered) # NOTE: sim freq
 
-        self.do_simulation(action_filtered, self.frame_skip)
         obs = self._get_obs()
         reward, reward_dict = self._get_reward(action_normalized)
         self.info["reward_dict"] = reward_dict
@@ -228,60 +232,6 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         truncated = False
         
         return obs, reward, terminated, truncated, self.info
-    
-    def do_simulation(self, ctrl, n_frames) -> None:
-        if np.array(ctrl).shape != (self.model.nu,):
-            raise ValueError(f"Action dimension mismatch. Expected {(self.model.nu,)}, found {np.array(ctrl).shape}")
-        self._step_mujoco_simulation(ctrl, n_frames)
-
-    def _step_mujoco_simulation(self, ctrl, n_frames):
-        self.data.ctrl[:] = ctrl
-
-        # NOTE: Custom Aero
-        if self.is_aero:
-            self.xd, R_body = self._get_original_states()
-            fa, ua, self.xd = aero(self.model, self.data, self.xa, self.xd, R_body)
-            # Apply Aero forces
-            # self.data.qfrc_applied[self.jvelID_dic["L5"]] = ua[0]
-            # self.data.qfrc_applied[self.jvelID_dic["L6"]] = ua[1]
-            # self.data.qfrc_applied[0:6] = ua[2:8]
-            self.data.qfrc_applied[self.jvelID_dic["L3"]] = ua[0]
-            self.data.qfrc_applied[self.jvelID_dic["L7"]] = ua[1]
-            self.data.xfrc_applied[self.bodyID_dic["Base"]] = [*ua[2:5], *ua[5:8]]
-            # Integrate Aero States
-            self.xa = self.xa + fa * self.dt
-
-        mj.mj_step(self.model, self.data, nstep=n_frames)
-        mj.mj_rnePostConstraint(self.model, self.data)
-
-    # NOTE: For aero()
-    def _get_original_states(self):
-        # Takes mujoco states vectors and converts to MATLAB states vectors defined in func_eom
-        qpos = self.data.qpos
-        qvel = self.data.qvel     
-        N = len(qpos)
-
-        xd = np.zeros(22)
-        xd[0] = qpos[self.posID_dic["L5"]]
-        xd[1] = qpos[self.posID_dic["L6"]]
-        if N == 21:
-            xd[2:5] = qpos[0:3]
-        else:
-            xd[2:5] = np.array([0,0,0.5])
-
-        xd[5] = qvel[self.jvelID_dic["L5"]]
-        xd[6] = qvel[self.jvelID_dic["L6"]]
-        
-        if N == 21:
-            xd[7:10] = qvel[0:3]
-            xd[10:13] = qvel[3:6]
-        else:
-            xd[7:10] = np.zeros(3)
-            xd[10:13] = np.zeros(3)
-
-        R_B = R_body(self.model, self.data)
-        xd[13:23] = np.transpose(R_B).flatten()
-        return xd, R_B
 
     def _update_data(self, step=True):
         # NOTE: Need to be modifid to obs states and ground truth states 
@@ -299,7 +249,7 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         w_position         = 5.0
         w_velocity         = 1.0
         w_angular_velocity = 5.0
-        w_orientation      = 5.0
+        w_orientation      = 10.0
         w_input            = 20.0
         w_delta_act        = 0.1
 
@@ -319,15 +269,15 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         desired_ori_norm     = np.array([0.0, 0.0, 0.0]).reshape(3,1)/np.pi # roll, pitch, yaw
         
         obs = self._get_obs()
-        current_pos_norm     = obs[0:3]/5 # [-5,5]
-        current_vel_norm     = obs[7:10]/5 # [-5,5]
-        current_ang_vel_norm = obs[10:13]/10 # [-10,10]
+        current_pos_norm     = obs[0:3]/5 # [-5,5] -> [-1,1]
+        current_vel_norm     = obs[7:10]/5 # [-5,5] -> [-1,1]
+        current_ang_vel_norm = obs[10:13]/10 # [-10,10] -> [-1,1]
         current_ori_norm     = quat2euler_raw(obs[3:7])/np.pi
 
-        pos_err       = np.linalg.norm(current_pos_norm - desired_pos_norm)
-        vel_err       = np.linalg.norm(current_vel_norm - desired_vel_norm)
-        ang_vel_err   = np.linalg.norm(current_ang_vel_norm - desired_ang_vel_norm)
-        ori_err       = np.linalg.norm(current_ori_norm - desired_ori_norm)
+        pos_err       = np.linalg.norm(current_pos_norm - desired_pos_norm) # [0,1]
+        vel_err       = np.linalg.norm(current_vel_norm - desired_vel_norm) # [0,1]
+        ang_vel_err   = np.linalg.norm(current_ang_vel_norm - desired_ang_vel_norm) # [0,1]
+        ori_err       = np.linalg.norm(current_ori_norm - desired_ori_norm) # [0,1]
         input_err     = np.linalg.norm(action_normalized) # It's not an error but let's just call it
         delta_act_err = np.linalg.norm(action_normalized - self.last_act_norm) # It's not an error but let's just call it
 
@@ -341,106 +291,55 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
     def _terminated(self, obs):
         if not((obs[0:3] <= self.pos_ub).all() 
            and (obs[0:3] >= self.pos_lb).all()):
-            print("Out of position bounds: {pos}  |  Timestep: {timestep}".format(pos=obs[0:3], timestep=self.timestep))
+            print("Out of position bounds: {pos}  |  Timestep: {timestep}  |  Time: {time}s".format(pos=obs[0:3], timestep=self.timestep, time=round(self.time_in_sec,2)))
             return True
-        if not((obs[7:10] <= self.vel_ub).all() 
-           and (obs[7:10] >= self.vel_lb).all()):
-            print("Out of velocity bounds: {vel}  |  Timestep: {timestep}".format(vel=obs[7:10], timestep=self.timestep))
+        if not(np.linalg.norm(obs[7:10]) <= self.speed_bound):
+            print("Out of speed bounds: {vel}  |  Timestep: {timestep}  |  Time: {time}s".format(vel=obs[7:10], timestep=self.timestep, time=round(self.time_in_sec,2)))
             return True
         if self.timestep >= self.max_timesteps:
-            print("Max step reached: {timestep}".format(timestep=self.max_timesteps))
+            print("Max step reached: Timestep: {timestep}  |  Time: {time}s".format(timestep=self.max_timesteps, time=round(self.time_in_sec,2)))
             return True
         else:
             return False
-
-    def get_bodyIDs(self, body_list):
-        bodyID_dic = {}
-        jntID_dic = {}
-        posID_dic = {}
-        jvelID_dic = {}
-        for bodyName in body_list:
-            mjID = mj.mj_name2id(self.model, mj.mjtObj.mjOBJ_BODY, bodyName)
-            jntID = self.model.body_jntadr[mjID]   # joint ID
-            jvelID = self.model.body_dofadr[mjID]  # joint velocity
-            posID = self.model.jnt_qposadr[jntID]  # joint position
-            bodyID_dic[bodyName] = mjID
-            jntID_dic[bodyName] = jntID
-            posID_dic[bodyName] = posID
-            jvelID_dic[bodyName] = jvelID
-        return bodyID_dic, jntID_dic, posID_dic, jvelID_dic
-
-    def get_jntIDs(self, jnt_list):
-        jointID_dic = {}
-        for jointName in jnt_list:
-            jointID = mj.mj_name2id(self.model, mj.mjtObj.mjOBJ_JOINT, jointName)
-            jointID_dic[jointName] = jointID
-        return jointID_dic
 
     def test(self, model):
         for i in range(5):
             obs = self.reset()
             # self.debug = True
             self.max_timesteps = 0.5 * self.max_timesteps
-
             log = {
-                "t": np.empty((0, 1)),
-                "x": np.empty((0, 6)),
+                "t": np.empty((0,1)),
+                "x": np.empty((0,6)),
                 "xd": self.goal,
-                "u": np.empty((0, 3)),
+                "u": np.empty((0,3)),
             }
             t = 0
-            log["x"] = np.append(
-                log["x"],
-                np.array(
-                    [np.concatenate((self.estimator.pos(), self.estimator.vel()))]
-                ),
-                axis=0,
-            )
+            log["x"] = np.append(log["x"], np.array([np.concatenate((self.estimator.pos(), self.estimator.vel()))]), axis=0)
             log["t"] = np.append(log["t"], t)
             total_reward = 0
-            for i in range(5000):
+            for _ in range(5000):
                 action, _state = model.predict(obs, deterministic=True)
-                obs, reward, terminated, info = self.step(action)
+                obs, reward, terminated, truncated, info = self.step(action)
                 total_reward += reward
                 t = t + self.dt
-                log["x"] = np.append(
-                    log["x"],
-                    np.array(
-                        [np.concatenate((self.estimator.pos(), self.estimator.vel()))]
-                    ),
-                    axis=0,
-                )
+                log["x"] = np.append(log["x"], np.array([np.concatenate((self.estimator.pos(), self.estimator.vel()))]), axis=0)
                 log["t"] = np.append(log["t"], t)
                 log["u"] = np.append(log["u"], np.array([self.last_act]), axis=0)
                 if terminated:
-                    print(f"total reward: {total_reward}")
+                    print(f"Total reward: {total_reward}")
                     total_reward = 0
                     self.plot(log)
                     obs = self.reset()
                     log = {
-                        "t": np.empty((0, 1)),
-                        "x": np.empty((0, 6)),
+                        "t": np.empty((0,1)),
+                        "x": np.empty((0,6)),
                         "xd": self.goal,
-                        "u": np.empty((0, 3)),
+                        "u": np.empty((0,3)),
                     }
                     t = 0
-                    log["x"] = np.append(
-                        log["x"],
-                        np.array(
-                            [
-                                np.concatenate(
-                                    (self.estimator.pos(), self.estimator.vel())
-                                )
-                            ]
-                        ),
-                        axis=0,
-                    )
+                    log["x"] = np.append(log["x"], np.array([np.concatenate((self.estimator.pos(), self.estimator.vel()))]), axis=0)
                     log["t"] = np.append(log["t"], t)
             self.debug = False
-            print(f"testing complete")
+            print(f"Test completed")
             self.plot(log)
         return log
-
-    def close(self):
-        if self.mujoco_renderer is not None:
-            self.mujoco_renderer.close()
