@@ -1,2 +1,0 @@
-Model name      Log       Flapping Motion     Timestep Length        Training Timestep
-best_model_1    PPO_1     F                   2e-5                   1e+7

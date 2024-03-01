@@ -1,8 +1,8 @@
 # Helpers
 import os
 import sys
-sys.path.append('/Users/mintaekim/Desktop/HRL/Flappy/Integrated/Flappy_Integrated/flappy_v2')
-sys.path.append('/Users/mintaekim/Desktop/HRL/Flappy/Integrated/Flappy_Integrated/flappy_v2/envs')
+sys.path.append('/Users/mintaekim/Desktop/HRL/Flappy/Integrated/Flappy_Integrated/flappy_v3')
+sys.path.append('/Users/mintaekim/Desktop/HRL/Flappy/Integrated/Flappy_Integrated/flappy_v3/envs')
 import numpy as np
 import jax.numpy as jnp
 from jax import jit
@@ -34,7 +34,7 @@ from R_body import R_body
 DEFAULT_CAMERA_CONFIG = {"trackbodyid": 0, "distance": 12.0}
 TRAJECTORY_TYPES = {"linear": 0, "circular": 1, "setpoint": 2}
 
-class FlappyEnv(MujocoEnv, utils.EzPickle):
+class FlappyEnv(gym.Env):
     metadata = {"render_modes": ["human", "rgb_array", "depth_array"]}
     
     def __init__(
@@ -78,22 +78,24 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         self.is_aero            = True
 
         # Observation, need to be reduce later for smoothness
-        self.n_state            = 84 # NOTE: change to the number of states *we can measure*
-        self.n_action           = 7  # NOTE: change to the number of action
+        self.n_state            = 84 # NOTE: pos, vel, ang_vel, ori, ori_vel
+        self.n_action           = 7  # NOTE: torque, f1, f2, f3, f4, f5, f6
         self.history_len_short  = 4
         self.history_len_long   = 10
         self.history_len        = self.history_len_short
         self.previous_obs       = deque(maxlen=self.history_len)
         self.previous_act       = deque(maxlen=self.history_len)
         self.last_act_norm      = np.zeros(self.n_action)
-        self.action_space       = Box(low=-100, high=100, shape=(self.n_action,))
+        
         self.observation_space  = Box(low=-np.inf, high=np.inf, shape=(13,)) # NOTE: change to the actual number of obs to actor policy
 
         # NOTE: the low & high does not actually limit the actions output from MLP network, manually clip instead
-        self.pos_lb = np.array([-5,-5,0.5]) # fight space dimensions: xyz
+        self.pos_lb = np.array([-5,-5,0.5])
         self.pos_ub = np.array([5,5,5])
+        self.displacement_bound = 5.0
         self.speed_bound = 100.0
 
+        # Action Space
         self.action_lower_bounds = np.array([-30,0,0,0,0,0,0])
         self.action_upper_bounds = np.array([0,1,1,1,1,0.5,0.5])
         self.action_bounds_scale = 0.0
@@ -101,29 +103,8 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
                                                           self.action_lower_bounds[5:7]])
         self.action_upper_bounds_actual = np.concatenate([(1 - self.action_bounds_scale) * self.action_upper_bounds[0:5],
                                                           self.action_upper_bounds[5:7]])
-        self.xa = np.zeros(3 * self.p.n_Wagner)
+        self.action_space = Box(low=self.action_lower_bounds_actual, high=self.action_upper_bounds_actual)
 
-        # MujocoEnv
-        self.model = mj.MjModel.from_xml_path(xml_file)
-        self.data = mj.MjData(self.model)
-        self.body_list = ["Base","L1","L2","L3","L4","L5","L6","L7",
-                          "L1R","L2R","L3R","L4R","L5R","L6R","L7R"]
-        self.joint_list = ['J1','J2','J3','J5','J6','J7','J10',
-                           'J1R','J2R','J3R','J5R','J6R','J7R','J10R']
-        self.bodyID_dic, self.jntID_dic, self.posID_dic, self.jvelID_dic = self.get_bodyIDs(self.body_list)
-        self.jID_dic = self.get_jntIDs(self.joint_list)
-        
-        utils.EzPickle.__init__(self, xml_file, frame_skip, reset_noise_scale, **kwargs)
-        MujocoEnv.__init__(self, xml_file, frame_skip, observation_space=self.observation_space, default_camera_config=default_camera_config, **kwargs)
-        
-        self.metadata = {
-            "render_modes": ["human", "rgb_array", "depth_array"],
-            "render_fps": int(np.round(1.0 / self.dt))
-        }
-        self.observation_structure = {
-            "qpos": self.data.qpos.size,
-            "qvel": self.data.qvel.size,
-        }
         self._reset_noise_scale = reset_noise_scale
 
         # Info for normalizing the state
@@ -132,12 +113,6 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         self._seed()
         self.reset()
         self._init_env()
-
-    @property
-    def dt(self):
-        # if self.is_aero: return 2e-5 * self.frame_skip
-        # else: return self.model.opt.timestep * self.frame_skip
-        return 2e-5
 
     def _init_env(self):
         print("Environment created")
@@ -224,8 +199,6 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         reward, reward_dict = self._get_reward(action_normalized)
         self.info["reward_dict"] = reward_dict
 
-        if self.render_mode == "human": self.render()
-
         self._update_data(step=True)
         self.last_act_norm = action_normalized
         terminated = self._terminated(obs)
@@ -303,7 +276,7 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
             return False
 
     def test(self, model):
-        for i in range(5):
+        for _ in range(5):
             obs = self.reset()
             # self.debug = True
             self.max_timesteps = 0.5 * self.max_timesteps
@@ -343,3 +316,6 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
             print(f"Test completed")
             self.plot(log)
         return log
+
+if "__name__" == "__main__":
+    env = FlappyEnv()

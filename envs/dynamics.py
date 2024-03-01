@@ -68,7 +68,7 @@ class Flappy():
         return np.copy(self.states) # NOTE: HACK there, need to replace to what we can measure onboard
     
     def inputs(self):
-        self.u_gain = np.zeros(9,)
+        self.u_gain = np.zeros(7,)
 
     # endregion
 
@@ -90,7 +90,7 @@ class Flappy():
     def _init_states(self):
         xk_init = np.zeros(14,)
         xd_init = np.zeros(22,)
-        xa_init = np.zeros(3 * (self.p.n_blade - self.p.n_blade_tail),)
+        xa_init = np.zeros(3 * (self.p.n_blade - self.p.n_blade_tail))
 
         Rb0 = rot_y(self.p.pitch_init) @ rot_x(self.p.roll_init)  # initial pitch and roll angle
         xd_init[13:22] = Rb0.T.reshape(9,)
@@ -174,9 +174,9 @@ class Flappy():
         y2 = np.clip(y2, 0.0001, self.p.thruster_max_force)
 
         # if (time(i) > p.wait_time):
-        #     u1 = p.kd * (p.flapping_freq * 2 * np.pi - xk_init[7])
+        #   u1 = p.kd * (p.flapping_freq * 2 * np.pi - xk_init[7])
         # else:
-        #     u1 = 0
+        #   u1 = 0
 
         f_thruster = np.zeros((3,4))  # inertial force
 
@@ -198,11 +198,11 @@ class Flappy():
         # tik = time.time()
         fk1, fd1, fa1 = func_eom(self.xk, self.xd, self.xa, u1, f_thruster, t_thruster, self.p, yaw_damping)
         # tok1 = time.time()
-        fk2, fd2, fa2 = func_eom(self.xk + fk1 * self.dt / 2, self.xd + fd1 * self.dt / 2, self.xa + fa1 * self.dt / 2, u1, f_thruster, t_thruster, self.p, yaw_damping)
+        fk2, fd2, fa2 = func_eom(self.xk+fk1*self.dt/2, self.xd+fd1*self.dt/2, self.xa+fa1*self.dt/2, u1, f_thruster, t_thruster, self.p, yaw_damping)
         # tok2 = time.time()
-        fk3, fd3, fa3 = func_eom(self.xk + fk2 * self.dt / 2, self.xd + fd2 * self.dt / 2, self.xa + fa2 * self.dt / 2, u1, f_thruster,t_thruster, self.p, yaw_damping)
+        fk3, fd3, fa3 = func_eom(self.xk+fk2*self.dt/2, self.xd+fd2*self.dt/2, self.xa+fa2*self.dt/2, u1, f_thruster,t_thruster, self.p, yaw_damping)
         # tok3 = time.time()
-        fk4, fd4, fa4 = func_eom(self.xk + fk3 * self.dt, self.xd + fd3 * self.dt, self.xa + fa3 * self.dt, u1, f_thruster, t_thruster, self.p, yaw_damping)
+        fk4, fd4, fa4 = func_eom(self.xk+fk3*self.dt, self.xd+fd3*self.dt, self.xa+fa3*self.dt, u1, f_thruster, t_thruster, self.p, yaw_damping)
         # tok4 = time.time()
         # print('step time:', tok1-tik, tok2-tik, tok3-tik, tok4-tik)
 

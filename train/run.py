@@ -1,6 +1,6 @@
 import os
 import sys
-sys.path.append('/Users/mintaekim/Desktop/HRL/Flappy/Integrated/Flappy_Integrated/flappy_v2')
+sys.path.append('/Users/mintaekim/Desktop/HRL/Flappy/Integrated/Flappy_Integrated/flappy_v3')
 from envs.ppo.ppo import PPO # Customized
 # from stable_baselines3 import PPO # Naive
 from stable_baselines3.common.vec_env import DummyVecEnv, VecMonitor
