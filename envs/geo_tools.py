@@ -6,8 +6,8 @@ from scipy.linalg import expm as scipyExpm
 
 def hat(vector):
     return np.array([[0., -vector[2], vector[1]], 
-                        [vector[2], 0., -vector[0]],
-                        [-vector[1], vector[0], 0.]])
+                    [vector[2], 0., -vector[0]],
+                    [-vector[1], vector[0], 0.]])
 
 def vee(matrix):
     return np.array([matrix[2,1], matrix[0,2], matrix[1,0]])

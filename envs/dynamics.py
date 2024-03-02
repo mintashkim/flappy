@@ -54,21 +54,23 @@ class Flappy():
         R_body = (self.xd[13:22].reshape(3,3)).T # body to inertial
         pitch = np.arcsin(np.clip(-R_body.T[0,2],-1,1))
         yaw = np.arctan2(R_body.T[0,1], R_body.T[0,0])
-        roll = np.arctan2(R_body.T[1, 2], R_body.T[2,2])
+        roll = np.arctan2(R_body.T[1,2], R_body.T[2,2])
         orientation = np.array([pitch, yaw, roll])
         return orientation
 
     def get_orientation_vel(self):
-        pitch_rate=self.xd[10]
-        yaw_rate=self.xd[11]
-        roll_rate=self.xd[12]
-        return pitch_rate, yaw_rate, roll_rate
+        pitch_rate = self.xd[10]
+        yaw_rate = self.xd[11]
+        roll_rate = self.xd[12]
+        orientation_vel = np.array([pitch_rate, yaw_rate, roll_rate])
+        return orientation_vel
     
     def get_obseverable(self):
-        return np.copy(self.states) # NOTE: HACK there, need to replace to what we can measure onboard
+        obsv = np.array([self.get_position(), self.get_velocity(), self.get_orientation(), self.get_orientation_vel()]).flatten()
+        return obsv # NOTE: HACK there, need to replace to what we can measure onboard
     
     def inputs(self):
-        self.u_gain = np.zeros(7,)
+        self.u_gain = np.zeros(9,)
 
     # endregion
 
@@ -210,4 +212,3 @@ class Flappy():
         self.xd = self.xd + (fd1/6 + fd2/3 + fd3/3 + fd4/6) * self.dt
         self.xa = self.xa + (fa1/6 + fa2/3 + fa3/3 + fa4/6) * self.dt
         self._states = np.concatenate([self.xk, self.xd, self.xa])
-

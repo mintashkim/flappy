@@ -17,7 +17,7 @@ def func_eom(xk, xd, xa, u1, u_thruster, u_torque, p, yaw_damping):
     # kinematic EOM: Ak*accel + hk = uk
     
     Ak, hk, uk = func_wing_kinematic(xk, u1, p.wing_conformation.flatten())
-    ak = (np.linalg.lstsq(Ak.astype('float64'), (uk.astype('float') - hk.astype('float')), rcond=None))[0]
+    ak = (np.linalg.lstsq(Ak.astype('float32'), (uk.astype('float32') - hk.astype('float32')), rcond=None))[0]
     
     # Determine fk = [vel ; accel]
     fk       = xk * 0
@@ -202,13 +202,13 @@ def func_eom(xk, xd, xa, u1, u_thruster, u_torque, p, yaw_damping):
         ut = ut + ((np.concatenate([np.zeros((3,5)), np.eye(3)], axis=1)).T @ (u_torque[:,i].reshape(3,1))).reshape(8,1)
 
     ut = ut + (np.concatenate((np.zeros((3,5)), np.eye(3)), axis=1)).T @ (yaw_damping.reshape(3,1))
-    ut = ut.astype('float64')
+    ut = ut.astype('float32')
     u_a_t_d = np.array([ua + ut - hd]).reshape(8,1)
     
     u_j = uj.reshape(2,1)
 
     hc = np.concatenate((u_a_t_d, u_j), axis=0)
-    hc = hc.astype('float64')
+    hc = hc.astype('float32')
     
     # Optional: add other states constraints
     if p.flag_constraint_dynamics == 1:
@@ -248,7 +248,7 @@ def func_eom(xk, xd, xa, u1, u_thruster, u_torque, p, yaw_damping):
     accel    = temp[0:8]
     lambda_  = temp[8:]
     R_body_D = R_body.dot(skew(w_body))
-    hc       = hc.astype('float64')
+    hc       = hc.astype('float32')
 
     # Determine fd
     fd        = xd * 0

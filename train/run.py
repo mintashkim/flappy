@@ -10,8 +10,8 @@ from envs.flappy_env import FlappyEnv
 
 
 log_path = os.path.join('logs')
-save_path = os.path.join('saved_models_flap')
-env = FlappyEnv(render_mode="human")
+save_path = os.path.join('saved_models_0')
+env = FlappyEnv()
 env = VecMonitor(DummyVecEnv([lambda: env]))
 
 stop_callback = StopTrainingOnRewardThreshold(reward_threshold=1000, verbose=1)

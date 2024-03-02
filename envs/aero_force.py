@@ -3,8 +3,8 @@ from numba import jit
 # import jax.numpy as jnp
 # from jax import jit
 import sys, os
-sys.path.append('/Users/mintaekim/Desktop/HRL/Flappy/Integrated/Flappy_Integrated/flappy_v2/envs')
-sys.path.append('/Users/mintaekim/Desktop/HRL/Flappy/Integrated/Flappy_Integrated/flappy_v2')
+sys.path.append('/Users/mintaekim/Desktop/HRL/Flappy/Integrated/Flappy_Integrated/flappy_v3/envs')
+sys.path.append('/Users/mintaekim/Desktop/HRL/Flappy/Integrated/Flappy_Integrated/flappy_v3')
 from symbolic_functions.func_wing_tail import *
 from func_create_wing_segment import func_create_wing_segment
 from parameter import Simulation_Parameter
