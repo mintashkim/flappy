@@ -7,7 +7,7 @@ class Simulation_Parameter:
 
         # Flags during parameter setup
         self.flag_use_optimized_model = 0 # 0 = dickinson's model, 1 = load cell optimization model
-        self.flag_reverse_wing = 0 # 0 = aerobat's forward sweep, 1 = reverse sweep
+        self.flag_reverse_wing = 1 # 0 = aerobat's forward sweep, 1 = reverse sweep
 
         # Flags during simulation
         self.flag_use_wagnermodel = 1 # 1 = wagner model, 0 = quasi-steady model
@@ -61,12 +61,12 @@ class Simulation_Parameter:
         self.wait_time = 0.01 # wait time before start applying flapping speed tracking controller
 
         # Airflow settings
-        self.airspeed = np.array([0, 0, 0]).reshape(3, 1) # freestream air speed (inertial frame)
+        self.airspeed = np.array([0,0,0]).reshape(3, 1) # freestream air speed (inertial frame)
         self.air_density = 1 # density of air (kg/m^3)
 
         # Flapping and crank controller gains
         self.kd = 400 # crank speed tracking controller gain
-        self.flapping_freq = 4.75 # flapping frequency in Hz
+        self.flapping_freq = 10.0 # flapping frequency in Hz
 
         self.flag_use_tail_stabilizer = True
 

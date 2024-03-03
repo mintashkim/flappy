@@ -75,7 +75,7 @@ class Flappy():
     # endregion
 
     def _init_const(self):
-        self.wc = np.exp(-self.p.wc_lp * 2 * np.pi * self.dt)
+        self.wc = np.exp(-self.p.wc_lp * 2*np.pi * self.dt)
 
     def _init_param(self):
         self.pitch_error = 0.
@@ -90,12 +90,12 @@ class Flappy():
         self.roll_error_d = 0.
 	
     def _init_states(self):
-        xk_init = np.zeros(14,)
-        xd_init = np.zeros(22,)
+        xk_init = np.zeros(14)
+        xd_init = np.zeros(22)
         xa_init = np.zeros(3 * (self.p.n_blade - self.p.n_blade_tail))
 
         Rb0 = rot_y(self.p.pitch_init) @ rot_x(self.p.roll_init)  # initial pitch and roll angle
-        xd_init[13:22] = Rb0.T.reshape(9,)
+        xd_init[13:22] = Rb0.flatten()
         xk_init[0:7] = func_initial_joint_angles(self.p.theta1_init, self.p.wing_conformation).reshape(7,)
 
         # Joint velocities
@@ -109,7 +109,7 @@ class Flappy():
         xd_init[0:2] = xk_init[3:5]
         xd_init[5:7] = xk_init[10:12]
     	# Body initial velocity
-        xd_init[7:10] = self.p.body_init_vel.reshape(3,)
+        xd_init[7:10] = self.p.body_init_vel.flatten()
    
         return xk_init, xd_init, xa_init
     
@@ -125,7 +125,7 @@ class Flappy():
         # u1 becomes to (9,), including p.KP_P, p.KI_P, p.KD_P, p.KP_R, p.KI_R, p.KD_R, p.KP_V, p.KI_V, kd
         # u_gain=np.array([KP_P,KI_P,KD_P, KP_R,KI_R,KD_R, KP_V,KI_V,kd])
         
-        R_body = self.xd[13:22].reshape(3,3).T  # %body to inertial
+        R_body = self.xd[13:22].reshape(3,3)  # body to inertial
         pitch = np.arcsin(np.clip(-R_body.T[0,2],-1,1))
         yaw = np.arctan2(R_body.T[0,1], R_body.T[0,0])
         roll = np.arctan2(R_body.T[1,2], R_body.T[2,2])
@@ -182,10 +182,10 @@ class Flappy():
 
         f_thruster = np.zeros((3,4))  # inertial force
 
-        f1 = R_body @ (np.array([x1, 0, 0])).reshape(3,1)
-        f2 = R_body @ (np.array([x2, 0, 0])).reshape(3,1)
-        f3 = R_body @ (np.array([0, -y1, 0])).reshape(3,1)
-        f4 = R_body @ (np.array([0, y2, 0])).reshape(3,1)
+        f1 = R_body @ (np.array([x1, 0, 0]).reshape(3,1))
+        f2 = R_body @ (np.array([x2, 0, 0]).reshape(3,1))
+        f3 = R_body @ (np.array([0, -y1, 0]).reshape(3,1))
+        f4 = R_body @ (np.array([0, y2, 0]).reshape(3,1))
 
         f_thruster = np.concatenate([f1, f2, f3, f4], axis=1) # 3x4
         t_thruster = np.zeros((3,4))
@@ -193,7 +193,7 @@ class Flappy():
         kd = u_gain[8]
         yaw_damper = -kd * yaw_rate
         #yaw_damper = -u_gain[8] * yaw_rate
-        yaw_damping = np.array([0, 0, yaw_damper])
+        yaw_damping = np.array([0,0,yaw_damper]).reshape(3,1)
 
         u1 = 0
         # sim

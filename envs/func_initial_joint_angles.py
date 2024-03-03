@@ -12,7 +12,8 @@ def func_initial_joint_angles(theta_1, wing_conformation):
     x0[[1,3]] = fsolve(solve_pos4, [0, 0], args=(theta_1, wing_conformation.flatten()), xtol=1e-8).reshape(2,1)
     x0[[2,5]] = fsolve(solve_pos7, [0, 0], args=(x0[[0,1]], wing_conformation.flatten()), xtol=1e-8).reshape(2,1)
     x0[[4,6]] = fsolve(solve_pos10, [0, 0], args=(x0[[3,5]], wing_conformation.flatten()), xtol=1e-8).reshape(2,1)
-    x0[4] = 0.2806
+    # From Matlab
+    x0 = np.array([-1.5708, 0.8912, 1.4493, 0.1980, -0.2806, 0.4953, -0.8275]).reshape(7,1)
 
     return x0
 
@@ -45,8 +46,8 @@ def solve_pos7(x_solve, x_in, wing_conformation):
     L4 = wing_conformation[8]
     L5a = wing_conformation[9]
     L5b = wing_conformation[10]
-    P1 = wing_conformation[17:19]
-    P8= wing_conformation[21:23]
+    P1 = wing_conformation[17:18]
+    P8= wing_conformation[21:22]
 
     # Input variables
     theta_1 = x_in[0]
@@ -72,8 +73,8 @@ def solve_pos10(x_solve, x_in, wing_conformation):
     L6 = wing_conformation[13]
     L7b = wing_conformation[15]
     L7c = wing_conformation[16]
-    P5 = wing_conformation[19:21]
-    P8= wing_conformation[21:23]
+    P5 = wing_conformation[19:20]
+    P8= wing_conformation[21:22]
 
     # Input variables
     theta_5 = x_in[0]
