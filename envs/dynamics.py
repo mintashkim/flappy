@@ -79,14 +79,17 @@ class Flappy():
 
     def _init_param(self):
         self.pitch_error = 0.
+        self.yaw_error = 0.
         self.roll_error = 0.
         self.vel_error = 0.
 
         self.pitch_error_i = 0.
+        self.yaw_error_i = 0.
         self.roll_error_i = 0.
         self.vel_error_i = 0.
 
         self.pitch_error_d = 0.
+        self.yaw_error_d = 0.
         self.roll_error_d = 0.
 	
     def _init_states(self):
@@ -122,8 +125,7 @@ class Flappy():
         ###################################
         ##### original PID controller #####
         ###################################
-        # u1 becomes to (9,), including p.KP_P, p.KI_P, p.KD_P, p.KP_R, p.KI_R, p.KD_R, p.KP_V, p.KI_V, kd
-        # u_gain=np.array([KP_P,KI_P,KD_P, KP_R,KI_R,KD_R, KP_V,KI_V,kd])
+        # u1 becomes(9,), including p.KP_P, p.KI_P, p.KD_P, p.KP_R, p.KI_R, p.KD_R, p.KP_V, p.KI_V, kd
         
         R_body = self.xd[13:22].reshape(3,3)  # body to inertial
         pitch = np.arcsin(np.clip(-R_body.T[0,2],-1,1))
@@ -138,30 +140,35 @@ class Flappy():
 
         # Roll and pitch error
         pitch_error_old = self.pitch_error
+        yaw_error_old = self.yaw_error
         roll_error_old = self.roll_error
         self.pitch_error = self.p.pitch_ref - pitch
+        self.yaw_error = self.p.yaw_ref - yaw
         self.roll_error = self.p.roll_ref - roll
         self.vel_error = self.p.vel_ref - vel_forward
 
         # Derivative, use low pass to prevent huge spikes
         pitch_rate = (self.pitch_error - pitch_error_old) / self.p.dt
+        yaw_rate = (self.yaw_error - yaw_error_old) / self.p.dt
         roll_rate = (self.roll_error - roll_error_old) / self.p.dt
         self.pitch_error_d = self.wc * self.pitch_error_d + (1 - self.wc) * pitch_rate
         self.roll_error_d = self.wc * self.roll_error_d + (1 - self.wc) * roll_rate
 
         # Integral
         self.pitch_error_i = self.pitch_error_i + self.pitch_error * self.p.dt
+        self.yaw_error_i = self.yaw_error_i + self.yaw_error * self.p.dt
         self.roll_error_i = self.roll_error_i + self.roll_error * self.p.dt
         self.vel_error_i = self.vel_error_i + self.vel_error * self.p.dt
 
-        # Desired u should be obtainbed by DRL, u_pitch, u_roll, u_vel should be intialized
-        # u_gain=np.array([KP_P, KI_P, KD_P, KP_R, KI_R, KD_R, KP_V, KI_V, kd])
-        # u_pitch = p.pitch_dir * (p.KP_P * self.pitch_error + p.KI_P * self.pitch_error_i + p.KD_P * self.pitch_error_d)
+        # Desired u should be obtainbed by RL, u_pitch, u_roll, u_vel should be intialized
+        # u_gain = np.array([KP_P, KI_P, KD_P, KP_Y, KI_Y, KD_Y, KP_R, KI_R, KD_R, KP_V, KI_V, kd])
         u_pitch = self.p.pitch_dir * (u_gain[0] * self.pitch_error + u_gain[1] * self.pitch_error_i + u_gain[2] * self.pitch_error_d)
+        # u_yaw = self.p.yaw_dir * (u_gain[3] * self.yaw_error + u_gain[4] * self.yaw_error_i + u_gain[5] * self.yaw_error_d)
         u_roll = self.p.roll_dir * (u_gain[3] * self.roll_error + u_gain[4] * self.roll_error_i + u_gain[5] * self.roll_error_d)
+        # NOTE: if use yaw: u_roll = self.p.roll_dir * (u_gain[6] * self.roll_error + u_gain[7] * self.roll_error_i + u_gain[8] * self.roll_error_d)
         u_vel = u_gain[6] * self.vel_error + u_gain[7] * self.vel_error_i
-        # u_roll = p.roll_dir * (p.KP_R * self.roll_error + p.KI_R * self.roll_error_i + p.KD_R * self.roll_error_d)
-        # u_vel = p.KP_V * self.vel_error + p.KI_V * self.vel_error_i
+        # NOTE: if use yaw: u_vel = u_gain[9] * self.vel_error + u_gain[10] * self.vel_error_i
+
 
         # Pitch output forces
         x1 = u_vel + u_pitch
@@ -187,26 +194,18 @@ class Flappy():
         f3 = R_body @ (np.array([0, -y1, 0]).reshape(3,1))
         f4 = R_body @ (np.array([0, y2, 0]).reshape(3,1))
 
-        f_thruster = np.concatenate([f1, f2, f3, f4], axis=1) # 3x4
+        f_thruster = np.concatenate([f1, f2, f3, f4], axis=1)
         t_thruster = np.zeros((3,4))
         yaw_rate = self.xd[12]
         kd = u_gain[8]
         yaw_damper = -kd * yaw_rate
-        #yaw_damper = -u_gain[8] * yaw_rate
         yaw_damping = np.array([0,0,yaw_damper]).reshape(3,1)
 
         u1 = 0
-        # sim
-        # tik = time.time()
         fk1, fd1, fa1 = func_eom(self.xk, self.xd, self.xa, u1, f_thruster, t_thruster, self.p, yaw_damping)
-        # tok1 = time.time()
         fk2, fd2, fa2 = func_eom(self.xk+fk1*self.dt/2, self.xd+fd1*self.dt/2, self.xa+fa1*self.dt/2, u1, f_thruster, t_thruster, self.p, yaw_damping)
-        # tok2 = time.time()
         fk3, fd3, fa3 = func_eom(self.xk+fk2*self.dt/2, self.xd+fd2*self.dt/2, self.xa+fa2*self.dt/2, u1, f_thruster,t_thruster, self.p, yaw_damping)
-        # tok3 = time.time()
         fk4, fd4, fa4 = func_eom(self.xk+fk3*self.dt, self.xd+fd3*self.dt, self.xa+fa3*self.dt, u1, f_thruster, t_thruster, self.p, yaw_damping)
-        # tok4 = time.time()
-        # print('step time:', tok1-tik, tok2-tik, tok3-tik, tok4-tik)
 
         self.xk = self.xk + (fk1/6 + fk2/3 + fk3/3 + fk4/6) * self.dt
         self.xd = self.xd + (fd1/6 + fd2/3 + fd3/3 + fd4/6) * self.dt

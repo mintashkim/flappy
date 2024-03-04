@@ -37,6 +37,13 @@ class Simulation_Parameter:
         self.KD_P = 0.1
         self.KI_P = 1
 
+        # PID controller yaw tracking
+        self.yaw_ref = np.deg2rad(0)
+        self.yaw_dir = 1
+        self.KP_Y = 2
+        self.KD_Y = 0.1
+        self.KI_Y = 1
+
         # PID controller roll tracking
         self.roll_ref = np.deg2rad(0)
         self.roll_dir = 1

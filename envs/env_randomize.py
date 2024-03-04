@@ -9,4 +9,4 @@ class EnvRandomizer(object):
 
     def randomize_dynamics(self):
         self.m = self._default_mass * (1.0 + np.random.uniform(-0.3, 0.3))
-        self.J = np.random.uniform(0.7, 1.3, (3, 3)) * self._default_inertia
+        self.J = np.random.uniform(0.7, 1.3, (3,3)) * self._default_inertia

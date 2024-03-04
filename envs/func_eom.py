@@ -3,7 +3,7 @@ import numpy as np
 from symbolic_functions.func_wing_kinematic import *
 from symbolic_functions.func_wing_rhRL import *
 from symbolic_functions.func_tail import *
-from symbolic_functions.func_Mh import *
+from envs.symbolic_functions.func_Mh import *
 from symbolic_functions.func_genforce_body import *
 from utility_functions import *
 
@@ -108,11 +108,11 @@ def func_eom(xk, xd, xa, u1, u_thruster, u_torque, p, yaw_damping):
         for i in range(nWagner):
 
             # Aero states and effective air speed
-            z1 = xa_m[i, 1]
-            z2 = xa_m[i, 2]
+            z1 = xa_m[i,1]
+            z2 = xa_m[i,2]
             # Downwash due to vortex
             wy = -a0 * c0 * U[i] / 4 / p.span_max * (n * np.sin(n * p.strip_theta[i])) / np.sin(p.strip_theta[i]) @ an
-            wn = vel_s_surf[2, i]
+            wn = vel_s_surf[2,i]
             w = wn + wy
             # print(w)
             
@@ -167,7 +167,7 @@ def func_eom(xk, xd, xa, u1, u_thruster, u_torque, p, yaw_damping):
         # Drag coefficient(quasi - steady)
         aoa = aoa.flatten()
         C_drag = drag_coeff(aoa[i], p.aero_model_drag)
-        e_lift = np.cross(e_effvel[:, i].flatten(), np.array([0,1,0])) 
+        e_lift = np.cross(e_effvel[:,i].flatten(), np.array([0,1,0])) 
         e_drag = (-e_effvel[:, i]).flatten()  # (3,1)
         lift = p.air_density / 2 * U[i]**2 * C_lift * delta_span * p.strip_c[i] * e_lift
         drag = p.air_density / 2 * U[i]**2 * C_drag * delta_span * p.strip_c[i] * e_drag
@@ -176,7 +176,6 @@ def func_eom(xk, xd, xa, u1, u_thruster, u_torque, p, yaw_damping):
         f_aero[:,i] = R_body @ Rw @ (drag + lift) # (3,1)
         ua = ua + Ba_s[:, :, i] @ (f_aero[:,i].reshape(3,1)) # （8,1)
         pa[:,i] =  pos_s[:,i]
-
 
     Md, hd = func_Mh(xd, p.params.flatten(), p.wing_conformation.flatten())
     # Apply joint constraints
@@ -192,13 +191,9 @@ def func_eom(xk, xd, xa, u1, u_thruster, u_torque, p, yaw_damping):
         ut = ut + ((np.concatenate([np.zeros((3,5)), np.eye(3)], axis=1)).T @ (u_torque[:,i].reshape(3,1))).reshape(8,1)
 
     ut = ut + (np.concatenate((np.zeros((3,5)), np.eye(3)), axis=1)).T@(yaw_damping.reshape(3,1))
-    ut = ut.astype('float64')
     u_a_t_d = np.array([ua + ut - hd]).reshape(8,1)
-    
     u_j = uj.reshape(2,1)
-
     hc = np.concatenate((u_a_t_d, u_j), axis=0)
-    hc = hc.astype('float64')
     
     # Optional: add other states constraints
     if p.flag_constraint_dynamics == 1:
