@@ -202,6 +202,7 @@ class Flappy():
         yaw_damping = np.array([0,0,yaw_damper]).reshape(3,1)
 
         u1 = 0
+        tic = time.perf_counter()
         fk1, fd1, fa1 = func_eom(self.xk, self.xd, self.xa, u1, f_thruster, t_thruster, self.p, yaw_damping)
         fk2, fd2, fa2 = func_eom(self.xk+fk1*self.dt/2, self.xd+fd1*self.dt/2, self.xa+fa1*self.dt/2, u1, f_thruster, t_thruster, self.p, yaw_damping)
         fk3, fd3, fa3 = func_eom(self.xk+fk2*self.dt/2, self.xd+fd2*self.dt/2, self.xa+fa2*self.dt/2, u1, f_thruster,t_thruster, self.p, yaw_damping)
@@ -211,3 +212,6 @@ class Flappy():
         self.xd = self.xd + (fd1/6 + fd2/3 + fd3/3 + fd4/6) * self.dt
         self.xa = self.xa + (fa1/6 + fa2/3 + fa3/3 + fa4/6) * self.dt
         self._states = np.concatenate([self.xk, self.xd, self.xa])
+        toc = time.perf_counter()
+
+        print("Elapsed time is ", toc-tic)

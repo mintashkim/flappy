@@ -1,6 +1,8 @@
 import numpy as np
 from numpy import cos, sin
 import time
+
+"""
 import matlab.engine
 
 eng = matlab.engine.start_matlab()
@@ -10,18 +12,18 @@ xd = np.array([1.98000000e-01, -2.80600000e-01, 0.00000000e+00, 0.00000000e+00,
                0.00000000e+00, 0.00000000e+00, 0.00000000e+00, 0.00000000e+00,
                0.00000000e+00, 9.61261696e-01, 2.40233785e-02, -2.74588472e-01,
                0.00000000e+00, 9.96194698e-01, 8.71557427e-02, 2.75637356e-01,
-               -8.37794771e-02, 9.57603805e-01])
+               -8.37794771e-02, 9.57603805e-01]).reshape(22,1)
 
 params = np.array([6.00000000e-02, 2.00000000e-03, 4.00000000e-03, 9.80000000e+00,
                    1.87500000e-05, 1.73750000e-05, 1.73750000e-05, 4.16708333e-07,
                    8.16708333e-07, 1.23333333e-06, 5.63341667e-06, 1.63341667e-06,
-                   7.26666667e-06])
+                   7.26666667e-06]).reshape(13,1)
 
 wing_conformation = np.array([0.0075, 0.035, 0.00409576, 0.00286788, 0.05, 0.00671,
                               0.006, -0.26179939, 0.036, 0.01118, 0.01, 0.07878,
                               -0.00389, 0.036, 0.09, 0.035, 0.015, -0.01,
-                              -0.0098, 0.02067324, 0.00752444, 0.0092976, 0.01993877, -0.042])
-
+                              -0.0098, 0.02067324, 0.00752444, 0.0092976, 0.01993877, -0.042]).reshape(24,1)
+"""
 def func_Mh(in1=None, in2=None, in3=None):
     Ib_1 = in2[4]
     Ib_2 = in2[5]
@@ -825,10 +827,12 @@ def ft_1(ct=None):
 
     return h
 
+"""
 time_sum = 0
 for _ in range(100):
-    tik = time.perf_counter()
-    eng.func_Mh(xd, params, wing_conformation)
-    tok = time.perf_counter()
-    time_sum += (tok-tik)
+    tic = time.perf_counter()
+    eng.func_Mh_MATLAB(xd, params, wing_conformation)
+    toc = time.perf_counter()
+    time_sum += (toc-tic)
 print(time_sum/100)
+"""
