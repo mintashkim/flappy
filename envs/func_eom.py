@@ -3,7 +3,7 @@ import numpy as np
 from symbolic_functions.func_wing_kinematic import *
 from symbolic_functions.func_wing_rhRL import *
 from symbolic_functions.func_tail import *
-from envs.symbolic_functions.func_Mh import *
+from envs.symbolic_functions.func_Mh_original import *
 from symbolic_functions.func_genforce_body import *
 from utility_functions import *
 
