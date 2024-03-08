@@ -172,7 +172,8 @@ class FlappyEnv(gym.Env):
         # post-process action
         if self.lpf_action: action_filtered = self.action_filter.filter(action)
         else: action_filtered = np.copy(action)
-        for _ in range(self.num_sims_per_env_step):
+        print(action_filtered)
+        for _ in range(self.num_sims_per_env_step): # 66 steps
             self.sim.step(action_filtered)
 
         obs = self._get_obs()

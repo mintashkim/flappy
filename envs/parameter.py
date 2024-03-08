@@ -73,7 +73,7 @@ class Simulation_Parameter:
 
         # Flapping and crank controller gains
         self.kd = 400 # crank speed tracking controller gain
-        self.flapping_freq = 10.0 # flapping frequency in Hz
+        self.flapping_freq = 4.75 # flapping frequency in Hz
 
         self.flag_use_tail_stabilizer = True
 

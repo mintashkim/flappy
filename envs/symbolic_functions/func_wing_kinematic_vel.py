@@ -37,6 +37,8 @@ def func_wing_kinematic_vel(in1, vel_theta1, in3):
 
        return output_ki_vel
 
+# Unit test
+"""
 if __name__ == '__main__':
 
     # Linkage length parameters (meter)
@@ -74,5 +76,4 @@ if __name__ == '__main__':
     wing_conformation = np.concatenate([L, P1, P5, P8, offset_x], axis=0)
     xk = np.array([-1.5708, 0.8912, 1.4493, 0.1980, -0.2806, 0.4953, -0.8275])
     print(func_wing_kinematic_vel(xk, 4.75 * 2 * np.pi, wing_conformation.flatten()))
-
-
+"""
