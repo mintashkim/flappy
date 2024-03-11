@@ -82,8 +82,8 @@ class FlappyEnv(gym.Env):
         self.observation_space  = Box(low=-np.inf, high=np.inf, shape=(12,)) # NOTE: change to the actual number of obs to actor policy
 
         # NOTE: the low & high does not actually limit the actions output from MLP network, manually clip instead
-        self.pos_lb = np.array([-5,-5,-5])
-        self.pos_ub = np.array([5,5,5])
+        self.pos_lb = -np.ones(3) * np.inf
+        self.pos_ub = np.ones(3) * np.inf
         self.displacement_bound = 5.0
         self.speed_bound = 100.0
 
@@ -172,7 +172,7 @@ class FlappyEnv(gym.Env):
         # post-process action
         if self.lpf_action: action_filtered = self.action_filter.filter(action)
         else: action_filtered = np.copy(action)
-        print(action_filtered)
+        # print(action_filtered)
         for _ in range(self.num_sims_per_env_step): # 66 steps
             self.sim.step(action_filtered)
 
@@ -181,7 +181,7 @@ class FlappyEnv(gym.Env):
         self.info["reward_dict"] = reward_dict
 
         self._update_data(step=True)
-        self.last_act_norm = action
+        self.last_act = action
         terminated = self._terminated(obs)
         truncated = False
         
