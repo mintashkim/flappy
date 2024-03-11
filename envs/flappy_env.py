@@ -47,6 +47,7 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         traj_type     = False,
         # MujocoEnv
         # xml_file: str = "../assets/Flappy_v8_FixedAxis.xml",
+        # xml_file: str = "../assets/Flappy_v8_JointInput.xml",
         xml_file: str = "../assets/Flappy_v8_Base.xml",
         frame_skip: int = 2,
         default_camera_config: Dict[str, Union[float, int]] = DEFAULT_CAMERA_CONFIG,
@@ -75,7 +76,7 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         self.noisy              = False
         self.randomize_dynamics = False # True to randomize dynamics
         self.lpf_action         = lpf_action # Low Pass Filter
-        self.is_aero            = True
+        self.is_aero            = False
 
         # Observation, need to be reduce later for smoothness
         self.n_state            = 84 # NOTE: change to the number of states *we can measure*
@@ -210,13 +211,16 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
 
     def step(self, action_normalized, restore=False):
         assert action_normalized.shape[0] == self.n_action and -1.0 <= action_normalized.all() <= 1.0
+        print(action_normalized)
         action = self._act_norm2actual(action_normalized)
+        action = action_normalized
         if self.timestep == 0: self.action_filter.init_history(action)
         # post-process action
         if self.lpf_action: action_filtered = self.action_filter.filter(action)
         else: action_filtered = np.copy(action)
         # action_filtered[0] = 0
         action_filtered[0] = -29.8451302
+        action_filtered = action_normalized
 
         self.do_simulation(action_filtered, self.frame_skip)
         obs = self._get_obs()
