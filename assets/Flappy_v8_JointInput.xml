@@ -12,7 +12,7 @@
   <compiler angle="radian" meshdir="meshes_v8/" balanceinertia="true" />
   <!-- <statistic meansize="0.0652069" extent="0.541984" center="0.0122683 -0.0367867 0.0356997"/> -->
 <!--  <option impratio="1" timestep="2e-5" gravity="0 0 -9.81" integrator="implicitfast"  density="1.225" viscosity="1.789e-5" wind="-16.5 0 0">-->
-  <option impratio="1" gravity="0 0 -9.81"  integrator="implicit" density="1.225" viscosity="1.789e-5"> Uncomment this to enable aerodynamics
+  <option impratio="1" gravity="0 0 -9.81" timestep="1e-3" integrator="implicit" density="1.225" viscosity="1.789e-5"> Uncomment this to enable aerodynamics
 <!--  <option impratio="1"  gravity="0 0 -9.81"  integrator="implicit" > Uncomment this to disable aerodynamics-->
 <!--    <flag contact="disable"/>-->
   </option>
@@ -66,8 +66,8 @@
     <light cutoff="100" diffuse="1 1 1" dir="-0 0 -1.3" directional="true" exponent="1" pos="0 0 1.3" specular=".1 .1 .1"/>
     <geom contype="1" conaffinity="1" condim="3" material="MatPlane" name="floor" pos="0 0 0" rgba="0.4 0.3 0.3 1" size="5 5 0.2" type="plane"/>
     <body name='Base' pos='0 0 2.0' quat="1 0 0 0">
-      <freejoint/>
-<!--      <joint name="z_slider" type="slide" axis="0 0 1" pos="-0.015 0 0"/>  Uncomment this to allow motion in z-->
+      <!-- <freejoint/> -->
+     <joint name="z_slider" type="slide" axis="0 0 1" pos="-0.015 0 0"/>  Uncomment this to allow motion in z
 <!--      <joint name="x_rot" type="hinge" axis="1 0 0" pos="-0.015 0 0"/>  Uncomment this to allow rolling-->
 <!--      <joint name="y_rot" type="hinge" axis="0 1 0" pos="-0.015 0 0"/>  Uncomment this to allow pitching-->
 <!--      <joint name="z_rot" type="hinge" axis="0 0 1" pos="-0.015 0 0"/>  Uncomment this to allow yawing-->
