@@ -240,6 +240,7 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         self._update_data(step=True)
         self.last_act_norm = action_normalized
         terminated = self._terminated(obs)
+        if terminated and self.timestep < 10: reward -= 10
         truncated = False
         
         # Plot recorded data
@@ -383,13 +384,13 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         scale_delta_act = 1.0
 
         desired_pos_norm     = np.array([0.0, 0.0, 2.0]).reshape(3,1)/5 # x y z 
-        desired_vel_norm     = np.array([0.0, 0.0, 0.0]).reshape(3,1)/5 # vx vy vz
+        desired_vel_norm     = np.array([0.0, 0.0, 0.0]).reshape(3,1)/self.speed_bound # vx vy vz
         desired_ang_vel_norm = np.array([0.0, 0.0, 0.0]).reshape(3,1)/10 # \omega_x \omega_y \omega_z
         desired_ori_norm     = np.array([0.0, 0.0, 0.0]).reshape(3,1)/np.pi # roll, pitch, yaw
         
         obs = self._get_obs()
         current_pos_norm     = obs[0:3]/5 # [-5,5] -> [-1,1]
-        current_vel_norm     = obs[7:10]/5 # [-5,5] -> [-1,1]
+        current_vel_norm     = obs[7:10]/self.speed_bound # [-5,5] -> [-1,1]
         current_ang_vel_norm = obs[10:13]/10 # [-10,10] -> [-1,1]
         current_ori_norm     = quat2euler_raw(obs[3:7])/np.pi
 
@@ -410,13 +411,13 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
     def _terminated(self, obs):
         if not((obs[0:3] <= self.pos_ub).all() 
            and (obs[0:3] >= self.pos_lb).all()):
-            print("Out of position bounds: {pos}  |  Timestep: {timestep}  |  Time: {time}s".format(pos=obs[0:3], timestep=self.timestep, time=round(self.time_in_sec,2)))
+            print("Out of position bounds: {pos}  |  Timestep: {timestep}  |  Time: {time}s".format(pos=np.round(obs[0:3],2), timestep=self.timestep, time=round(self.timestep*self.dt,2)))
             return True
         if not(np.linalg.norm(obs[7:10]) <= self.speed_bound):
-            print("Out of speed bounds: {vel}  |  Timestep: {timestep}  |  Time: {time}s".format(vel=obs[7:10], timestep=self.timestep, time=round(self.time_in_sec,2)))
+            print("Out of speed bounds: {vel}  |  Timestep: {timestep}  |  Time: {time}s".format(vel=np.round(obs[7:10],2), timestep=self.timestep, time=round(self.timestep*self.dt,2)))
             return True
         if self.timestep >= self.max_timesteps:
-            print("Max step reached: Timestep: {timestep}  |  Time: {time}s".format(timestep=self.max_timesteps, time=round(self.time_in_sec,2)))
+            print("Max step reached: Timestep: {timestep}  |  Time: {time}s".format(timestep=self.max_timesteps, time=round(self.timestep*self.dt,2)))
             return True
         else:
             return False
