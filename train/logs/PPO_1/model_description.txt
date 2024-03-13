@@ -1,0 +1,3 @@
+Moving along z-axis
+Timestep 1e-3
+Did not work well

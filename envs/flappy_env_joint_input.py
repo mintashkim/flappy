@@ -68,7 +68,7 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         self.is_visual          = is_visual
         self.randomize          = randomize
         self.debug              = debug
-        self.is_plotting_joint  = True
+        self.is_plotting_joint  = False
         self.traj_type          = traj_type
         self.noisy              = False
         self.randomize_dynamics = False # True to randomize dynamics
@@ -90,7 +90,7 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         # NOTE: the low & high does not actually limit the actions output from MLP network, manually clip instead
         self.pos_lb = np.array([-5,-5,0.5]) # fight space dimensions: xyz
         self.pos_ub = np.array([5,5,5])
-        self.speed_bound = 100.0
+        self.speed_bound = 10.0
 
         # self.action_lower_bounds = np.array([-30,0,0,0,0,0,0])
         # self.action_upper_bounds = np.array([0,1,1,1,1,0.5,0.5])
