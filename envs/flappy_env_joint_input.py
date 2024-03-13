@@ -92,13 +92,6 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         self.pos_ub = np.array([5,5,5])
         self.speed_bound = 10.0
 
-        # self.action_lower_bounds = np.array([-30,0,0,0,0,0,0])
-        # self.action_upper_bounds = np.array([0,1,1,1,1,0.5,0.5])
-        # self.action_bounds_scale = 0.0
-        # self.action_lower_bounds_actual = np.concatenate([self.action_lower_bounds[0:5] + self.action_bounds_scale * self.action_upper_bounds[0:5], 
-        #                                                   self.action_lower_bounds[5:7]])
-        # self.action_upper_bounds_actual = np.concatenate([(1 - self.action_bounds_scale) * self.action_upper_bounds[0:5],
-        #                                                   self.action_upper_bounds[5:7]])
         self.xa = np.zeros(3 * self.p.n_Wagner)
 
         # MujocoEnv
@@ -255,7 +248,17 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         self._step_mujoco_simulation(ctrl, n_frames)
 
     def _step_mujoco_simulation(self, ctrl, n_frames):
+        if self.timestep < 100:
+            ctrl = self._launch_control(ctrl)
+        self._apply_control(ctrl=ctrl)
+        mj.mj_step(self.model, self.data, nstep=n_frames)
 
+    def _launch_control(self, ctrl):
+        ctrl[2:6] = np.array([0.6, 0.6, 0.6, 0.6])
+        ctrl[6:] = np.array([0.0, 0.0])
+        return ctrl
+
+    def _apply_control(self, ctrl):
         self.data.actuator("Motor1").ctrl[0] = ctrl[2]  # data.ctrl[1] # front
         self.data.actuator("Motor2").ctrl[0] = ctrl[3]  # data.ctrl[2] # back
         self.data.actuator("Motor3").ctrl[0] = ctrl[4]  # data.ctrl[3] # left
@@ -282,10 +285,10 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         # Apply angles to Joints
         self.data.actuator("J5_angle").ctrl[0] = J5_d
         self.data.actuator("J6_angle").ctrl[0] = J6_d
-
-        mj.mj_step(self.model, self.data, nstep=n_frames)
-
         # NOTE: Record joint angles
+        self._record_joint(_J5=_J5, _J6=_J6)
+
+    def _record_joint(self, _J5, _J6):
         J5 = self.data.qpos[self.posID_dic["L3"]] + np.deg2rad(11.345825599281223) # Get angle from mujoco
         J6 = self.data.qpos[self.posID_dic["L7"]] - np.deg2rad(27.45260202) + J5
         self.SimTime.append(np.round((self.timestep + 1) * self.dt, 3))
