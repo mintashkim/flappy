@@ -10,7 +10,7 @@ from envs.flappy_env_joint_input import FlappyEnv
 
 
 log_path = os.path.join('logs')
-save_path = os.path.join('saved_models_joint_input_3')
+save_path = os.path.join('saved_models_joint_input_5')
 env = FlappyEnv(render_mode="human")
 env = VecMonitor(DummyVecEnv([lambda: env]))
 
@@ -61,5 +61,5 @@ print("Loaded model prediction: ")
 print(loaded_model.predict(obs_sample, deterministic=True))
 
 print("Evaluation start")
-evaluate_policy(model, env, n_eval_episodes=5, render=True)
+evaluate_policy(loaded_model, env, n_eval_episodes=5, render=True)
 env.close()

@@ -98,10 +98,8 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         self.model = mj.MjModel.from_xml_path(xml_file)
         self.model.opt.timestep = self.dt
         self.data = mj.MjData(self.model)
-        self.body_list = ["Base","L1","L2","L3","L4","L5","L6","L7",
-                          "L1R","L2R","L3R","L4R","L5R","L6R","L7R"]
-        self.joint_list = ['J1','J2','J3','J5','J6','J7','J10',
-                           'J1R','J2R','J3R','J5R','J6R','J7R','J10R']
+        self.body_list = ["Base","L1","L2","L3","L4","L5","L6","L7","L1R","L2R","L3R","L4R","L5R","L6R","L7R"]
+        self.joint_list = ['J1','J2','J3','J5','J6','J7','J10','J1R','J2R','J3R','J5R','J6R','J7R','J10R']
         self.bodyID_dic, self.jntID_dic, self.posID_dic, self.jvelID_dic = self.get_bodyIDs(self.body_list)
         self.jID_dic = self.get_jntIDs(self.joint_list)
         # Joint Input
