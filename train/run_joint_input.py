@@ -21,20 +21,25 @@ eval_callback = EvalCallback(env,
                              best_model_save_path=save_path,
                              verbose=1)
 
-net_arch = {'pi': [512,256,256,128],
-            'vf': [512,256,256,128]}
+# net_arch = {'pi': [512,256,256,128],
+#             'vf': [512,256,256,128]}
+# net_arch = {'pi': [64,128,128,64],
+#             'vf': [64,128,128,64]}
+net_arch = {'pi': [128,256,256,128],
+            'vf': [128,256,256,128]}
 
 model = PPO('MlpPolicy', 
             env=env,
             learning_rate=1e-4,
-            n_steps=2048, # The number of steps to run for each environment per update
+            n_steps=2048, # The number of steps to run for each environment per update / 2048
             batch_size=256,
-            gamma=0.98,  # 0.99 # look forward 1.65s
+            gamma=0.99,  # 0.99 # look forward 1.65s
             gae_lambda=0.95,
             clip_range=0.2,
             ent_coef=0.01, # Makes PPO explore
             verbose=1,
             policy_kwargs={'net_arch':net_arch},
+                        #    'features_extractor_class'},
             tensorboard_log=log_path,
             device='mps'
             )
