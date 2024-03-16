@@ -4,6 +4,6 @@ Aerodynamics: Mujoco built-in
 Reward: if terminated: if timestep < 1000: reward -= 10
 Launch Control: if timestep < 100
 I/O History: Short(4) / Obs (97,)
-n_steps: 2048
+n_steps: 256
 net_arch: {'pi': [128,256,256,128],
            'vf': [128,256,256,128]}

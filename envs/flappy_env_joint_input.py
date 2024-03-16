@@ -58,7 +58,7 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         # Frequency
         self.max_timesteps         = max_timesteps
         self.timestep: int         = 0
-        self.sim_freq              = self.sim.freq # NOTE: 2000Hz for hard coding
+        self.sim_freq: int         = self.sim.freq # NOTE: 2000Hz for hard coding
         # self.dt                    = 1.0 / self.sim_freq # NOTE: 1/2000s for hard coding
         self.policy_freq: float    = 30.0 # NOTE: 30Hz but the real control frequency might not be exactly 30Hz because we round up the num_sims_per_env_step
         self.num_sims_per_env_step = self.sim_freq // self.policy_freq # 2000//30 = 66
@@ -220,8 +220,6 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         return self.action_lower_bounds_actual + (act + 1)/2.0 * (self.action_upper_bounds_actual - self.action_lower_bounds_actual)
 
     def step(self, action_normalized, restore=False):
-        print(self.data.time)
-        
         action = action_normalized
         if self.timestep == 0: self.action_filter.init_history(action)
         # post-process action
@@ -239,10 +237,10 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         self.last_act_norm = action_normalized
         terminated = self._terminated(obs)
         if terminated and self.timestep < 1000: reward -= 10
-        truncated = False
+        truncated = self._truncated()
         
         # Plot recorded data
-        if self.is_plotting_joint and self.timestep == 1000:
+        if self.is_plotting_joint and self.timestep==500:
             self._plot_joint()
         
         return obs, reward, terminated, truncated, self.info
@@ -283,8 +281,8 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
             self.xa = self.xa + fa * self.dt
 
         # Joint Input Data
-        _J5 = np.interp(np.round(self.data.time,3), self.t_m, self.J5_m, period=1.0/self.sim.flapping_freq)
-        _J6 = np.interp(np.round(self.data.time,3), self.t_m, self.J6_m, period=1.0/self.sim.flapping_freq)
+        _J5 = np.interp(self.timestep*self.dt, self.t_m, self.J5_m, period=1.0/self.sim.flapping_freq)
+        _J6 = np.interp(self.timestep*self.dt, self.t_m, self.J6_m, period=1.0/self.sim.flapping_freq)
         J5_d = _J5 - np.deg2rad(11.345825599281223)  # convert to Mujoco Reference
         J6_d = _J6 + np.deg2rad(27.45260202) - _J5
         # Apply angles to Joints
@@ -299,8 +297,8 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         self.SimTime.append(np.round((self.timestep + 1) * self.dt, 3))
         self.JointAng_ref[0].append(_J5)
         self.JointAng_ref[1].append(_J6)
-        J5v_d = np.interp(self.data.time, self.t_m, self.J5v_m, period=1.0 / self.sim.flapping_freq) # Get velocity just for comparison
-        J6v_d = np.interp(self.data.time, self.t_m, self.J6v_m, period=1.0 / self.sim.flapping_freq)
+        J5v_d = np.interp(np.round(self.data.time,3), self.t_m, self.J5v_m, period=1.0 / self.sim.flapping_freq) # Get velocity just for comparison
+        J6v_d = np.interp(np.round(self.data.time,3), self.t_m, self.J6v_m, period=1.0 / self.sim.flapping_freq)
         self.JointVel_ref[0].append(J5v_d)
         self.JointVel_ref[1].append(J6v_d)
         self.JointAng[0].append(J5)
@@ -417,15 +415,20 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         return total_reward, reward_dict
 
     def _terminated(self, obs):
+        # self.data.time = 0.0
         pos = np.array(obs[0:3], dtype=float)
         vel = np.array(obs[7:10], dtype=float)
         if not((pos <= self.pos_ub).all() 
            and (pos >= self.pos_lb).all()):
             print("Out of position bounds: {pos}  |  Timestep: {timestep}  |  Time: {time}s".format(pos=np.round(pos,2), timestep=self.timestep, time=round(self.timestep*self.dt,2)))
             return True
-        if not(np.linalg.norm(vel) <= self.speed_bound):
+        elif not(np.linalg.norm(vel) <= self.speed_bound):
             print("Out of speed bounds: {vel}  |  Timestep: {timestep}  |  Time: {time}s".format(vel=np.round(vel,2), timestep=self.timestep, time=round(self.timestep*self.dt,2)))
             return True
+        else:
+            return False
+
+    def _truncated(self):
         if self.timestep >= self.max_timesteps:
             print("Max step reached: Timestep: {timestep}  |  Time: {time}s".format(timestep=self.max_timesteps, time=round(self.timestep*self.dt,2)))
             return True
