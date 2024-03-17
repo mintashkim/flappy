@@ -74,7 +74,7 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         self.randomize_dynamics = False # True to randomize dynamics
         self.lpf_action         = lpf_action # Low Pass Filter
         self.is_aero            = False
-        self.is_launch_control  = True
+        self.is_launch_control  = False
 
         # Observation, need to be reduce later for smoothness
         self.n_state            = 84 # NOTE: change to the number of states *we can measure*
@@ -213,7 +213,7 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
             [self.previous_obs.append(obs_curr) for _ in range(self.history_len)]
             [self.previous_act.append(np.zeros(self.n_action)) for _ in range(self.history_len)]
         obs_prev = np.concatenate([np.array(self.previous_obs,dtype=object).flatten(), np.array(self.previous_act,dtype=object).flatten()])
-        obs = np.concatenate([obs_curr, obs_prev])
+        obs = np.concatenate([obs_prev, obs_curr])
         return obs
 
     def _act_norm2actual(self, act):

@@ -10,7 +10,7 @@ from envs.flappy_env_joint_input import FlappyEnv
 
 
 log_path = os.path.join('logs')
-save_path = os.path.join('saved_models/saved_models_joint_input_5')
+save_path = os.path.join('saved_models/saved_models_joint_input_test_2')
 env = FlappyEnv(render_mode="human")
 env = VecMonitor(DummyVecEnv([lambda: env]))
 
@@ -25,18 +25,18 @@ eval_callback = EvalCallback(env,
 #             'vf': [512,256,256,128]}
 # net_arch = {'pi': [64,128,128,64],
 #             'vf': [64,128,128,64]}
-net_arch = {'pi': [128,256,256,128],
-            'vf': [128,256,256,128]}
+net_arch = {'pi': [128,128],
+            'vf': [128,128]}
 
 model = PPO('MlpPolicy', 
             env=env,
             learning_rate=1e-4,
-            n_steps=256, # The number of steps to run for each environment per update / 2048
+            n_steps=512, # The number of steps to run for each environment per update / 2048
             batch_size=256,
-            gamma=0.99,  # 0.99 # look forward 1.65s
+            gamma=0.98,  # 0.99 # look forward 1.65s
             gae_lambda=0.95,
             clip_range=0.2,
-            ent_coef=0.01, # Makes PPO explore
+            ent_coef=0.05, # Makes PPO explore
             verbose=1,
             policy_kwargs={'net_arch':net_arch},
             tensorboard_log=log_path,

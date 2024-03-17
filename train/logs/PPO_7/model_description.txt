@@ -1,0 +1,9 @@
+DOF: Moving along all directions
+Timestep: 1e-3
+Aerodynamics: Mujoco built-in
+Reward: if terminated: if timestep < 1000: reward -= 10
+Launch Control: if timestep < 100
+I/O History: Short(4) / Obs (97,)
+n_steps: 1024
+net_arch: {'pi': [128,128],
+           'vf': [128,128]}
