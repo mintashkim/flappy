@@ -59,7 +59,7 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         self.max_timesteps         = max_timesteps
         self.timestep: int         = 0
         self.sim_freq: int         = self.sim.freq # NOTE: 2000Hz for hard coding
-        # self.dt                    = 1.0 / self.sim_freq # NOTE: 1/2000s for hard coding
+        # self.dt                    = 1e-3 # NOTE: 1.0 / self.sim_freq = 1/2000s for hard coding
         self.policy_freq: float    = 30.0 # NOTE: 30Hz but the real control frequency might not be exactly 30Hz because we round up the num_sims_per_env_step
         self.num_sims_per_env_step = self.sim_freq // self.policy_freq # 2000//30 = 66
         self.secs_per_env_step     = self.num_sims_per_env_step / self.sim_freq # 66/2000 = 0.033s
@@ -75,6 +75,7 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         self.lpf_action         = lpf_action # Low Pass Filter
         self.is_aero            = False
         self.is_launch_control  = False
+        self.is_action_bound    = True
 
         # Observation, need to be reduce later for smoothness
         self.n_state            = 84 # NOTE: change to the number of states *we can measure*
@@ -84,8 +85,9 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         self.history_len        = self.history_len_short
         self.previous_obs       = deque(maxlen=self.history_len)
         self.previous_act       = deque(maxlen=self.history_len)
-        self.last_act_norm      = np.zeros(self.n_action)
-        self.action_space       = Box(low=-100, high=100, shape=(self.n_action,))
+        self.last_act           = np.zeros(self.n_action)
+        self.action_space       = Box(low=np.array([-np.inf, -np.inf, 0.4, 0.4, 0.4, 0.4, 0.0, 0.0]),
+                                      high=np.array([np.inf, np.inf, 0.8, 0.8, 0.8, 0.8, 0.3, 0.3]))
         self.observation_space  = Box(low=-np.inf, high=np.inf, shape=(97,)) # NOTE: change to the actual number of obs to actor policy
 
         # NOTE: the low & high does not actually limit the actions output from MLP network, manually clip instead
@@ -140,8 +142,6 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
 
     @property
     def dt(self):
-        # NOTE: For some reason, this does not set model.opt.timestep
-        #       To do so, go to xml and set timestep=""
         return 1e-3
 
     def _init_env(self):
@@ -149,9 +149,10 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         action = self.action_space.sample()
         print("Sample action: {}".format(action))
         print("Control range: {}".format(self.model.actuator_ctrlrange))
+        print("Actual Control range: {}".format(self.action_space))
         print("Launch control: {}".format(self.is_launch_control))
         print("Time step(dt): {}".format(self.dt))
-        
+
     def _init_action_filter(self):
         self.action_filter = ActionFilterButter(
             lowcut        = None,
@@ -208,6 +209,7 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
             self.sim.set_dynamics()
 
     def _get_obs(self):
+        # NOTE: obs = [o_t-4:o_t, a_t-4:a_t, o_t], shape=(97,)=13x4+8x4+13x1
         obs_curr = self.data.sensordata
         if self.timestep == 0:
             [self.previous_obs.append(obs_curr) for _ in range(self.history_len)]
@@ -219,8 +221,7 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
     def _act_norm2actual(self, act):
         return self.action_lower_bounds_actual + (act + 1)/2.0 * (self.action_upper_bounds_actual - self.action_lower_bounds_actual)
 
-    def step(self, action_normalized, restore=False):
-        action = action_normalized
+    def step(self, action, restore=False):
         if self.timestep == 0: self.action_filter.init_history(action)
         # post-process action
         if self.lpf_action: action_filtered = self.action_filter.filter(action)
@@ -228,14 +229,16 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
 
         self.do_simulation(action_filtered, self.frame_skip)
         obs = self._get_obs()
-        reward, reward_dict = self._get_reward(action_normalized)
+        obs_curr = obs[84:] # self.data.sensordata
+
+        reward, reward_dict = self._get_reward(action, obs_curr)
         self.info["reward_dict"] = reward_dict
 
         if self.render_mode == "human": self.render()
 
         self._update_data(step=True)
-        self.last_act_norm = action_normalized
-        terminated = self._terminated(obs)
+        self.last_act = action
+        terminated = self._terminated(obs_curr)
         if terminated and self.timestep < 1000: reward -= 10
         truncated = self._truncated()
         
@@ -360,23 +363,19 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         return xd, R_body
 
     def _update_data(self, step=True):
-        # NOTE: Need to be modifid to obs states and ground truth states 
-        self.obs_states = self._get_obs()
-        self.gt_states = self._get_obs()
+        # NOTE: Need to be modifid to obs states and ground truth states
         if step:
             self.timestep += 1
             self.time_in_sec += self.secs_per_env_step
-            # self.time_in_sec = self.sim.time
-            # self.reference_generator.update_ref_env(self.time_in_sec)
 
-    def _get_reward(self, action_normalized):
+    def _get_reward(self, action, obs_curr):
         names = ['position_error', 'velocity_error', 'angular_velocity', 'orientation_error', 'input', 'delta_acs']
 
-        w_position         = 5.0
+        w_position         = 10.0
         w_velocity         = 1.0
         w_angular_velocity = 5.0
-        w_orientation      = 10.0
-        w_input            = 5.0
+        w_orientation      = 5.0
+        w_input            = 1.0
         w_delta_act        = 0.1
 
         reward_weights = np.array([w_position, w_velocity, w_angular_velocity, w_orientation, w_input, w_delta_act])
@@ -394,18 +393,17 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         desired_ang_vel_norm = np.array([0.0, 0.0, 0.0]).reshape(3,1)/10 # \omega_x \omega_y \omega_z
         desired_ori_norm     = np.array([0.0, 0.0, 0.0]).reshape(3,1)/np.pi # roll, pitch, yaw
         
-        obs = self._get_obs()
-        current_pos_norm     = obs[0:3]/5 # [-5,5] -> [-1,1]
-        current_vel_norm     = obs[7:10]/self.speed_bound # [-5,5] -> [-1,1]
-        current_ang_vel_norm = obs[10:13]/10 # [-10,10] -> [-1,1]
-        current_ori_norm     = quat2euler_raw(obs[3:7])/np.pi
+        current_pos_norm     = obs_curr[0:3]/5 # [-5,5] -> [-1,1]
+        current_vel_norm     = obs_curr[7:10]/self.speed_bound # [-5,5] -> [-1,1]
+        current_ang_vel_norm = obs_curr[10:13]/10 # [-10,10] -> [-1,1]
+        current_ori_norm     = quat2euler_raw(obs_curr[3:7])/np.pi
 
         pos_err       = np.linalg.norm(current_pos_norm - desired_pos_norm) # [0,1]
         vel_err       = np.linalg.norm(current_vel_norm - desired_vel_norm) # [0,1]
         ang_vel_err   = np.linalg.norm(current_ang_vel_norm - desired_ang_vel_norm) # [0,1]
         ori_err       = np.linalg.norm(current_ori_norm - desired_ori_norm) # [0,1]
-        input_err     = np.linalg.norm(action_normalized) # It's not an error but let's just call it
-        delta_act_err = np.linalg.norm(action_normalized - self.last_act_norm) # It's not an error but let's just call it
+        input_err     = np.linalg.norm(action) # It's not an error but let's just call it
+        delta_act_err = np.linalg.norm(action - self.last_act) # It's not an error but let's just call it
 
         rewards = np.exp(-np.array([scale_pos, scale_vel, scale_ang_vel, scale_ori, scale_input, scale_delta_act]
                          * np.array([pos_err, vel_err, ang_vel_err, ori_err, input_err, delta_act_err])))
@@ -414,10 +412,9 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
 
         return total_reward, reward_dict
 
-    def _terminated(self, obs):
-        # self.data.time = 0.0
-        pos = np.array(obs[0:3], dtype=float)
-        vel = np.array(obs[7:10], dtype=float)
+    def _terminated(self, obs_curr):
+        pos = np.array(obs_curr[0:3], dtype=float)
+        vel = np.array(obs_curr[7:10], dtype=float)
         if not((pos <= self.pos_ub).all() 
            and (pos >= self.pos_lb).all()):
             print("Out of position bounds: {pos}  |  Timestep: {timestep}  |  Time: {time}s".format(pos=np.round(pos,2), timestep=self.timestep, time=round(self.timestep*self.dt,2)))
