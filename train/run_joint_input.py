@@ -14,7 +14,7 @@ save_path = os.path.join('saved_models/saved_models_joint_input_test')
 env = FlappyEnv(render_mode="human")
 env = VecMonitor(DummyVecEnv([lambda: env]))
 
-stop_callback = StopTrainingOnRewardThreshold(reward_threshold=3000, verbose=1)
+stop_callback = StopTrainingOnRewardThreshold(reward_threshold=10000, verbose=1)
 eval_callback = EvalCallback(env,
                              callback_on_new_best=stop_callback,
                              eval_freq=10000,

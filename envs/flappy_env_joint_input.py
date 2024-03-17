@@ -76,6 +76,7 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         self.is_aero            = False
         self.is_launch_control  = False
         self.is_action_bound    = True
+        self.is_rs_reward       = True # Rich-Sutton Reward
 
         # Observation, need to be reduce later for smoothness
         self.n_state            = 84 # NOTE: change to the number of states *we can measure*
@@ -228,18 +229,18 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         else: action_filtered = np.copy(action)
 
         self.do_simulation(action_filtered, self.frame_skip)
+        if self.render_mode == "human": self.render()
+
         obs = self._get_obs()
         obs_curr = obs[84:] # self.data.sensordata
 
         reward, reward_dict = self._get_reward(action, obs_curr)
         self.info["reward_dict"] = reward_dict
 
-        if self.render_mode == "human": self.render()
-
         self._update_data(step=True)
         self.last_act = action
         terminated = self._terminated(obs_curr)
-        if terminated and self.timestep < 1000: reward -= 10
+        if self.is_rs_reward: reward += int(not terminated)
         truncated = self._truncated()
         
         # Plot recorded data
@@ -388,17 +389,17 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         scale_input     = 1.0 # action already normalized
         scale_delta_act = 1.0
 
-        desired_pos_norm     = np.array([0.0, 0.0, 2.0]).reshape(3,1)/5 # x y z 
-        desired_vel_norm     = np.array([0.0, 0.0, 0.0]).reshape(3,1)/self.speed_bound # vx vy vz
-        desired_ang_vel_norm = np.array([0.0, 0.0, 0.0]).reshape(3,1)/10 # \omega_x \omega_y \omega_z
-        desired_ori_norm     = np.array([0.0, 0.0, 0.0]).reshape(3,1)/np.pi # roll, pitch, yaw
+        desired_pos_norm     = np.array([0.0,0.0,2.0]).reshape(3,1)/5 # x y z 
+        desired_vel_norm     = np.array([0.0,0.0,0.0]).reshape(3,1)/self.speed_bound # vx vy vz
+        desired_ang_vel_norm = np.array([0.0,0.0,0.0]).reshape(3,1)/10 # \omega_x \omega_y \omega_z
+        desired_ori_norm     = np.array([0.0,0.0,0.0]).reshape(3,1)/np.pi # roll, pitch, yaw
         
         current_pos_norm     = obs_curr[0:3]/5 # [-5,5] -> [-1,1]
         current_vel_norm     = obs_curr[7:10]/self.speed_bound # [-5,5] -> [-1,1]
         current_ang_vel_norm = obs_curr[10:13]/10 # [-10,10] -> [-1,1]
         current_ori_norm     = quat2euler_raw(obs_curr[3:7])/np.pi
 
-        pos_err       = np.linalg.norm(current_pos_norm - desired_pos_norm) # [0,1]
+        pos_err       = np.linalg.norm(current_pos_norm - desired_pos_norm) + np.abs(current_pos_norm[2]-desired_pos_norm[2]) # [0,1]
         vel_err       = np.linalg.norm(current_vel_norm - desired_vel_norm) # [0,1]
         ang_vel_err   = np.linalg.norm(current_ang_vel_norm - desired_ang_vel_norm) # [0,1]
         ori_err       = np.linalg.norm(current_ori_norm - desired_ori_norm) # [0,1]
