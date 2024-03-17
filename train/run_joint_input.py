@@ -10,14 +10,14 @@ from envs.flappy_env_joint_input import FlappyEnv
 
 
 log_path = os.path.join('logs')
-save_path = os.path.join('saved_models/saved_models_PPO_9')
+save_path = os.path.join('saved_models/saved_models_PPO_10')
 env = FlappyEnv(render_mode="human")
 env = VecMonitor(DummyVecEnv([lambda: env]))
 
-stop_callback = StopTrainingOnRewardThreshold(reward_threshold=10000, verbose=1)
+stop_callback = StopTrainingOnRewardThreshold(reward_threshold=20000, verbose=1)
 eval_callback = EvalCallback(env,
                              callback_on_new_best=stop_callback,
-                             eval_freq=10000,
+                             eval_freq=100000,
                              best_model_save_path=save_path,
                              verbose=1)
 
@@ -32,7 +32,7 @@ model = PPO('MlpPolicy',
             env=env,
             learning_rate=1e-4,
             n_steps=512, # The number of steps to run for each environment per update / 2048
-            batch_size=256,
+            batch_size=64,
             gamma=0.98,  # 0.99 # look forward 1.65s
             gae_lambda=0.95,
             clip_range=0.2,

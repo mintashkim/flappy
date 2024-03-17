@@ -75,7 +75,7 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         self.lpf_action         = lpf_action # Low Pass Filter
         self.is_aero            = False
         self.is_launch_control  = False
-        self.is_action_bound    = True
+        self.is_action_bound    = False
         self.is_rs_reward       = True # Rich-Sutton Reward
 
         # Observation, need to be reduce later for smoothness
@@ -87,8 +87,7 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         self.previous_obs       = deque(maxlen=self.history_len)
         self.previous_act       = deque(maxlen=self.history_len)
         self.last_act           = np.zeros(self.n_action)
-        self.action_space       = Box(low=np.array([-np.inf, -np.inf, 0.4, 0.4, 0.4, 0.4, 0.0, 0.0]),
-                                      high=np.array([np.inf, np.inf, 0.8, 0.8, 0.8, 0.8, 0.3, 0.3]))
+        self.action_space       = self._set_action_space()
         self.observation_space  = Box(low=-np.inf, high=np.inf, shape=(97,)) # NOTE: change to the actual number of obs to actor policy
 
         # NOTE: the low & high does not actually limit the actions output from MLP network, manually clip instead
@@ -142,14 +141,24 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         self._init_env()
 
     @property
-    def dt(self):
+    def dt(self) -> float:
         return 1e-3
+
+    def _set_action_space(self):
+        bounds = self.model.actuator_ctrlrange.copy().astype(np.float32)
+        low, high = bounds.T
+        if self.is_action_bound:
+            self.action_space = Box(low=np.array([-2.0, 1.57, 0.4, 0.4, 0.4, 0.4, 0.0, 0.0]),
+                                    high=np.array([-1.57, 1.57, 0.8, 0.8, 0.8, 0.8, 0.3, 0.3]))
+        else:
+            self.action_space = Box(low=low, high=high)
+        return self.action_space
 
     def _init_env(self):
         print("Environment created")
         action = self.action_space.sample()
         print("Sample action: {}".format(action))
-        print("Control range: {}".format(self.model.actuator_ctrlrange))
+        print("Control range: {}".format(self.model.actuator_ctrlrange.T))
         print("Actual Control range: {}".format(self.action_space))
         print("Launch control: {}".format(self.is_launch_control))
         print("Time step(dt): {}".format(self.dt))
@@ -223,8 +232,8 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         return self.action_lower_bounds_actual + (act + 1)/2.0 * (self.action_upper_bounds_actual - self.action_lower_bounds_actual)
 
     def step(self, action, restore=False):
+        if self.timestep%1000==0: print(action)
         if self.timestep == 0: self.action_filter.init_history(action)
-        # post-process action
         if self.lpf_action: action_filtered = self.action_filter.filter(action)
         else: action_filtered = np.copy(action)
 
@@ -243,9 +252,8 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         if self.is_rs_reward: reward += int(not terminated)
         truncated = self._truncated()
         
-        # Plot recorded data
-        if self.is_plotting_joint and self.timestep==500:
-            self._plot_joint()
+        if terminated: print(self.last_act)
+        if self.is_plotting_joint and self.timestep==500: self._plot_joint() # Plot recorded data
         
         return obs, reward, terminated, truncated, self.info
     
