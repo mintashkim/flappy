@@ -389,10 +389,10 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         scale_input     = 1.0 # action already normalized
         scale_delta_act = 1.0
 
-        desired_pos_norm     = np.array([0.0,0.0,2.0]).reshape(3,1)/5 # x y z 
-        desired_vel_norm     = np.array([0.0,0.0,0.0]).reshape(3,1)/self.speed_bound # vx vy vz
-        desired_ang_vel_norm = np.array([0.0,0.0,0.0]).reshape(3,1)/10 # \omega_x \omega_y \omega_z
-        desired_ori_norm     = np.array([0.0,0.0,0.0]).reshape(3,1)/np.pi # roll, pitch, yaw
+        desired_pos_norm     = np.array([0.0,0.0,2.0])/5 # x y z 
+        desired_vel_norm     = np.array([0.0,0.0,0.0])/self.speed_bound # vx vy vz
+        desired_ang_vel_norm = np.array([0.0,0.0,0.0])/10 # \omega_x \omega_y \omega_z
+        desired_ori_norm     = np.array([0.0,0.0,0.0])/np.pi # roll, pitch, yaw
         
         current_pos_norm     = obs_curr[0:3]/5 # [-5,5] -> [-1,1]
         current_vel_norm     = obs_curr[7:10]/self.speed_bound # [-5,5] -> [-1,1]
