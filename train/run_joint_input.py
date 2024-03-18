@@ -17,7 +17,7 @@ env = VecMonitor(DummyVecEnv([lambda: env]))
 stop_callback = StopTrainingOnRewardThreshold(reward_threshold=20000, verbose=1)
 eval_callback = EvalCallback(env,
                              callback_on_new_best=stop_callback,
-                             eval_freq=100000,
+                             eval_freq=10000,
                              best_model_save_path=save_path,
                              verbose=1)
 
@@ -33,7 +33,7 @@ model = PPO('MlpPolicy',
             learning_rate=1e-4,
             n_steps=512, # The number of steps to run for each environment per update / 2048
             batch_size=64,
-            gamma=0.98,  # 0.99 # look forward 1.65s
+            gamma=0.99,  # 0.99 # look forward 1.65s
             gae_lambda=0.95,
             clip_range=0.2,
             ent_coef=0.05, # Makes PPO explore

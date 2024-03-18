@@ -49,11 +49,13 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         frame_skip: int = 1,
         default_camera_config: Dict[str, Union[float, int]] = DEFAULT_CAMERA_CONFIG,
         reset_noise_scale: float = 0.01,
+        is_transfer = False,
         **kwargs
     ):
         # Dynamics simulator
         self.p = Simulation_Parameter()
         self.sim = Flappy(p=self.p, render=is_visual)
+        self.model = mj.MjModel.from_xml_path(xml_file)
 
         # Frequency
         self.max_timesteps         = max_timesteps
@@ -65,18 +67,21 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         self.secs_per_env_step     = self.num_sims_per_env_step / self.sim_freq # 66/2000 = 0.033s
         self.policy_freq: int      = int(1.0/self.secs_per_env_step) # 1000/33 = 30Hz
 
-        self.is_visual          = is_visual
         self.randomize          = randomize
         self.debug              = debug
-        self.is_plotting_joint  = False
         self.traj_type          = traj_type
         self.noisy              = False
         self.randomize_dynamics = False # True to randomize dynamics
         self.lpf_action         = lpf_action # Low Pass Filter
+        
+        self.is_visual          = is_visual
+        self.is_transfer        = is_transfer
+        self.is_plotting_joint  = False
         self.is_aero            = False
         self.is_launch_control  = False
-        self.is_action_bound    = False
+        self.is_action_bound    = True
         self.is_rs_reward       = True # Rich-Sutton Reward
+        self.is_history         = False
 
         # Observation, need to be reduce later for smoothness
         self.n_state            = 84 # NOTE: change to the number of states *we can measure*
@@ -98,7 +103,6 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         self.xa = np.zeros(3*self.p.n_Wagner)
 
         # MujocoEnv
-        self.model = mj.MjModel.from_xml_path(xml_file)
         self.model.opt.timestep = self.dt
         self.data = mj.MjData(self.model)
         self.body_list = ["Base","L1","L2","L3","L4","L5","L6","L7","L1R","L2R","L3R","L4R","L5R","L6R","L7R"]
@@ -221,18 +225,21 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
     def _get_obs(self):
         # NOTE: obs = [o_t-4:o_t, a_t-4:a_t, o_t], shape=(97,)=13x4+8x4+13x1
         obs_curr = self.data.sensordata
-        if self.timestep == 0:
-            [self.previous_obs.append(obs_curr) for _ in range(self.history_len)]
-            [self.previous_act.append(np.zeros(self.n_action)) for _ in range(self.history_len)]
-        obs_prev = np.concatenate([np.array(self.previous_obs,dtype=object).flatten(), np.array(self.previous_act,dtype=object).flatten()])
-        obs = np.concatenate([obs_prev, obs_curr])
+        if self.is_history:
+            if self.timestep == 0:
+                [self.previous_obs.append(obs_curr) for _ in range(self.history_len)]
+                [self.previous_act.append(np.zeros(self.n_action)) for _ in range(self.history_len)]
+            obs_prev = np.concatenate([np.array(self.previous_obs,dtype=object).flatten(), np.array(self.previous_act,dtype=object).flatten()])
+            obs = np.concatenate([obs_prev, obs_curr])
+        else:
+            obs = obs_curr
         return obs
 
     def _act_norm2actual(self, act):
         return self.action_lower_bounds_actual + (act + 1)/2.0 * (self.action_upper_bounds_actual - self.action_lower_bounds_actual)
 
     def step(self, action, restore=False):
-        if self.timestep%1000==0: print(action)
+        # if self.timestep%1000==0: print(np.array(action))
         if self.timestep == 0: self.action_filter.init_history(action)
         if self.lpf_action: action_filtered = self.action_filter.filter(action)
         else: action_filtered = np.copy(action)
@@ -241,15 +248,15 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         if self.render_mode == "human": self.render()
 
         obs = self._get_obs()
-        obs_curr = obs[84:] # self.data.sensordata
-
+        if self.is_history: obs_curr = obs[84:] # self.data.sensordata
+        else: obs_curr = obs
         reward, reward_dict = self._get_reward(action, obs_curr)
         self.info["reward_dict"] = reward_dict
 
         self._update_data(step=True)
         self.last_act = action
         terminated = self._terminated(obs_curr)
-        if self.is_rs_reward: reward += int(not terminated)
+        if self.is_rs_reward and (not self.is_transfer): reward += int(not terminated)
         truncated = self._truncated()
         
         if terminated: print(self.last_act)
@@ -408,6 +415,7 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         current_ori_norm     = quat2euler_raw(obs_curr[3:7])/np.pi
 
         pos_err       = np.linalg.norm(current_pos_norm - desired_pos_norm) + np.abs(current_pos_norm[2]-desired_pos_norm[2]) # [0,1]
+        if self.is_transfer: pos_err += np.linalg.norm(current_pos_norm[0:2] - desired_pos_norm[0:2]) # Extra penalize x,y error
         vel_err       = np.linalg.norm(current_vel_norm - desired_vel_norm) # [0,1]
         ang_vel_err   = np.linalg.norm(current_ang_vel_norm - desired_ang_vel_norm) # [0,1]
         ori_err       = np.linalg.norm(current_ori_norm - desired_ori_norm) # [0,1]
