@@ -49,8 +49,8 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         **kwargs
     ):
         # Dynamics simulator
-        self.p = Simulation_Parameter()
-        self.sim = Flappy(p=self.p, render=is_visual)
+        # self.p = Simulation_Parameter()
+        # self.sim = Flappy(p=self.p, render=is_visual)
         self.model = mj.MjModel.from_xml_path(xml_file)
         self.model.opt.timestep = self.dt
         self.data = mj.MjData(self.model)
@@ -58,12 +58,12 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         # Frequency
         self.max_timesteps         = max_timesteps
         self.timestep: int         = 0
-        self.sim_freq: int         = self.sim.freq # NOTE: 2000Hz for hard coding
+        # self.sim_freq: int         = self.sim.freq # NOTE: 2000Hz for hard coding
         # self.dt                    = 1e-3 # NOTE: 1.0 / self.sim_freq = 1/2000s for hard coding
-        self.policy_freq: float    = 30.0 # NOTE: 30Hz but the real control frequency might not be exactly 30Hz because we round up the num_sims_per_env_step
-        self.num_sims_per_env_step = self.sim_freq // self.policy_freq # 2000//30 = 66
-        self.secs_per_env_step     = self.num_sims_per_env_step / self.sim_freq # 66/2000 = 0.033s
-        self.policy_freq: int      = int(1.0/self.secs_per_env_step) # 1000/33 = 30Hz
+        # self.policy_freq: float    = 30.0 # NOTE: 30Hz but the real control frequency might not be exactly 30Hz because we round up the num_sims_per_env_step
+        # self.num_sims_per_env_step = self.sim_freq // self.policy_freq # 2000//30 = 66
+        # self.secs_per_env_step     = self.num_sims_per_env_step / self.sim_freq # 66/2000 = 0.033s
+        # self.policy_freq: int      = int(1.0/self.secs_per_env_step) # 1000/33 = 30Hz
 
         self.randomize          = randomize
         self.debug              = debug
@@ -112,7 +112,7 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         self.J5v_m = self.sim.flapping_freq/2 * self.Angle_data.loc[:,2]  # Mujoco reference joint angle velocity (θ_5_dot)
         self.J6v_m = self.sim.flapping_freq/2 * self.Angle_data.loc[:,3]  # Mujoco reference joint angle velocity (θ_6_dot)
         self.t_m = np.linspace(0, 1.0/self.sim.flapping_freq, num=len(self.J5_m))
-        # Record Early Stage
+        # Record Structure for Early Stage
         self.SimTime = []
         self.ua_ = []
         self.JointAng = [[],[]]
@@ -248,8 +248,6 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         if self.timestep == 0: self.action_filter.init_history(action)
         if self.lpf_action: action_filtered = self.action_filter.filter(action)
         else: action_filtered = np.copy(action)
-        action_filtered[6] = 0
-        action_filtered[7] = 0
         self.do_simulation(action_filtered, self.frame_skip)
         if self.render_mode == "human": self.render()
 
@@ -259,7 +257,7 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         reward, reward_dict = self._get_reward(action_filtered, obs_curr)
         self.info["reward_dict"] = reward_dict
 
-        self._update_data(step=True)
+        self._update_data(step=True, obs_curr=obs_curr, action=action_filtered)
         self.last_act = action_filtered
         terminated = self._terminated(obs_curr)
         if self.is_rs_reward and (not self.is_transfer): reward += int(not terminated)
@@ -389,7 +387,6 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
             self.previous_obs.append(obs_curr)
             self.previous_act.append(action)
             self.timestep += 1
-            self.time_in_sec += self.secs_per_env_step
 
     def _get_reward(self, action, obs_curr):
         names = ['position_error', 'velocity_error', 'angular_velocity', 'orientation_error', 'input', 'delta_acs']
