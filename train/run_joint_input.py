@@ -21,6 +21,7 @@ eval_callback = EvalCallback(env,
                              best_model_save_path=save_path,
                              verbose=1)
 
+# NOTE: if is_history: use 128
 # net_arch = {'pi': [512,256,256,128],
 #             'vf': [512,256,256,128]}
 # net_arch = {'pi': [64,128,128,64],

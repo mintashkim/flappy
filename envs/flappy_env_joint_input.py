@@ -84,7 +84,7 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         # Observation, need to be reduce later for smoothness
         self.n_state            = 84 # NOTE: change to the number of states *we can measure*
         self.n_action           = 8  # NOTE: change to the number of action
-        self.history_len_short  = 4
+        self.history_len_short  = 4 # NOTE: [o_{t-4}:o_{t}, a_{t-4}:a_{t}], o_{t} = [sensordata, θ_5, θ_6]
         self.history_len_long   = 10
         self.history_len        = self.history_len_short
         self.previous_obs       = deque(maxlen=self.history_len)
@@ -156,7 +156,7 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
 
     def _set_observation_space(self):
         if self.is_history:
-            obs_shape = self.data.sensordata.shape[0]*(self.history_len+1) + self.action_space.shape[0]*self.history_len
+            obs_shape = (self.data.sensordata.shape[0]+2)*(self.history_len+1) + self.action_space.shape[0]*self.history_len
             observation_space = Box(low=-np.inf, high=np.inf, shape=(obs_shape,))
             return observation_space
         else:
@@ -229,8 +229,8 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
             self.sim.set_dynamics()
 
     def _get_obs(self):
-        # NOTE: obs = [o_t-4:o_t, a_t-4:a_t, o_t], shape=(97,)=13x4+8x4+13x1
-        obs_curr = self.data.sensordata
+        # NOTE: obs = [o_t-4:o_t, a_t-4:a_t, o_t], shape=(105,)=15x4+8x4+13x1
+        obs_curr = np.concatenate([self.data.sensordata, self.data.actuator("J5_angle").ctrl[0], self.data.actuator("J6_angle").ctrl[0]])
         if self.is_history:
             if self.timestep == 0:
                 [self.previous_obs.append(obs_curr) for _ in range(self.history_len)]
@@ -384,9 +384,10 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         xd[13:23] = list(np.transpose(R_body).flatten())
         return xd, R_body
 
-    def _update_data(self, step=True):
-        # NOTE: Need to be modifid to obs states and ground truth states
+    def _update_data(self, obs_curr, action, step=True):
         if step:
+            self.previous_obs.append(obs_curr)
+            self.previous_act.append(action)
             self.timestep += 1
             self.time_in_sec += self.secs_per_env_step
 
