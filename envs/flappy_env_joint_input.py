@@ -265,7 +265,7 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         if self.is_rs_reward and (not self.is_transfer): reward += int(not terminated)
         truncated = self._truncated()
         
-        if terminated: print(self.last_act[2:])
+        if terminated: print(np.round(self.last_act[2:],2))
         if self.is_plotting_joint and self.timestep == 500: self._plot_joint() # Plot recorded data
         
         return obs, reward, terminated, truncated, self.info
