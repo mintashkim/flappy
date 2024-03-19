@@ -10,7 +10,7 @@ from envs.flappy_env_joint_input import FlappyEnv
 
 
 log_path = os.path.join('logs')
-save_path = os.path.join('saved_models/saved_models_PPO_10')
+save_path = os.path.join('saved_models/saved_models_PPO_13')
 env = FlappyEnv(render_mode="human")
 env = VecMonitor(DummyVecEnv([lambda: env]))
 
@@ -25,23 +25,29 @@ eval_callback = EvalCallback(env,
 #             'vf': [512,256,256,128]}
 # net_arch = {'pi': [64,128,128,64],
 #             'vf': [64,128,128,64]}
-net_arch = {'pi': [128,128],
-            'vf': [128,128]}
+net_arch = {'pi': [64,64,64],
+            'vf': [64,64,64]}
+
+def linear_schedule(initial_value):
+    if isinstance(initial_value, str):
+        initial_value = float(initial_value)
+    def func(progress):
+        return progress * initial_value
+    return func
 
 model = PPO('MlpPolicy', 
             env=env,
-            learning_rate=1e-4,
-            n_steps=512, # The number of steps to run for each environment per update / 2048
-            batch_size=64,
+            learning_rate=3e-4,
+            n_steps=2048, # The number of steps to run for each environment per update / 2048
+            batch_size=256,
             gamma=0.99,  # 0.99 # look forward 1.65s
             gae_lambda=0.95,
-            clip_range=0.2,
-            ent_coef=0.05, # Makes PPO explore
+            clip_range=linear_schedule(0.2),
+            ent_coef=0.01, # Makes PPO explore
             verbose=1,
             policy_kwargs={'net_arch':net_arch},
             tensorboard_log=log_path,
-            device='mps'
-            )
+            device='mps')
 
 model.learn(total_timesteps=1e+7, # The total number of samples (env steps) to train on
             progress_bar=True,

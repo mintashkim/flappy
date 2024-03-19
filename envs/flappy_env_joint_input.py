@@ -7,9 +7,7 @@ from typing import Dict, Union
 from collections import deque
 import matplotlib.pyplot as plt
 import pandas as pd
-import time
 # Gym
-import gymnasium as gym
 from gymnasium.spaces import Box
 from gymnasium import utils
 from gymnasium.utils import seeding
@@ -23,12 +21,10 @@ from aero_force import aero
 from action_filter import ActionFilterButter
 from env_randomize import EnvRandomizer
 from utility_functions import *
-import utility_trajectory as ut
 from rotation_transformations import *
-from R_body import R_body
 
 
-DEFAULT_CAMERA_CONFIG = {"trackbodyid": 0, "distance": 12.0}
+DEFAULT_CAMERA_CONFIG = {"trackbodyid": 0, "distance": 10.0}
 TRAJECTORY_TYPES = {"linear": 0, "circular": 1, "setpoint": 2}
 
 class FlappyEnv(MujocoEnv, utils.EzPickle):
@@ -56,6 +52,8 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         self.p = Simulation_Parameter()
         self.sim = Flappy(p=self.p, render=is_visual)
         self.model = mj.MjModel.from_xml_path(xml_file)
+        self.model.opt.timestep = self.dt
+        self.data = mj.MjData(self.model)
 
         # Frequency
         self.max_timesteps         = max_timesteps
@@ -79,8 +77,8 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         self.is_plotting_joint  = False
         self.is_aero            = False
         self.is_launch_control  = False
-        self.is_action_bound    = True
-        self.is_rs_reward       = True # Rich-Sutton Reward
+        self.is_action_bound    = False
+        self.is_rs_reward       = False # Rich-Sutton Reward
         self.is_history         = False
 
         # Observation, need to be reduce later for smoothness
@@ -93,7 +91,7 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         self.previous_act       = deque(maxlen=self.history_len)
         self.last_act           = np.zeros(self.n_action)
         self.action_space       = self._set_action_space()
-        self.observation_space  = Box(low=-np.inf, high=np.inf, shape=(97,)) # NOTE: change to the actual number of obs to actor policy
+        self.observation_space  = self._set_observation_space()
 
         # NOTE: the low & high does not actually limit the actions output from MLP network, manually clip instead
         self.pos_lb = np.array([-5,-5,0.5]) # fight space dimensions: xyz(m)
@@ -103,8 +101,6 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         self.xa = np.zeros(3*self.p.n_Wagner)
 
         # MujocoEnv
-        self.model.opt.timestep = self.dt
-        self.data = mj.MjData(self.model)
         self.body_list = ["Base","L1","L2","L3","L4","L5","L6","L7","L1R","L2R","L3R","L4R","L5R","L6R","L7R"]
         self.joint_list = ['J1','J2','J3','J5','J6','J7','J10','J1R','J2R','J3R','J5R','J6R','J7R','J10R']
         self.bodyID_dic, self.jntID_dic, self.posID_dic, self.jvelID_dic = self.get_bodyIDs(self.body_list)
@@ -158,12 +154,22 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
             self.action_space = Box(low=low, high=high)
         return self.action_space
 
+    def _set_observation_space(self):
+        if self.is_history:
+            obs_shape = self.data.sensordata.shape[0]*(self.history_len+1) + self.action_space.shape[0]*self.history_len
+            observation_space = Box(low=-np.inf, high=np.inf, shape=(obs_shape,))
+            return observation_space
+        else:
+            obs_shape = self.data.sensordata.shape[0]
+            observation_space = Box(low=-np.inf, high=np.inf, shape=(obs_shape,))
+            return observation_space
+
     def _init_env(self):
         print("Environment created")
-        action = self.action_space.sample()
-        print("Sample action: {}".format(action))
-        print("Control range: {}".format(self.model.actuator_ctrlrange.T))
-        print("Actual Control range: {}".format(self.action_space))
+        print("Sample action: {}".format(self.action_space.sample()))
+        print("Action Space: {}".format(np.array(self.model.actuator_ctrlrange.T)))
+        print("Actual Action Space: {}".format(np.array(self.action_space)))
+        print("Observation Space: {}".format(np.array(self.observation_space)))
         print("Launch control: {}".format(self.is_launch_control))
         print("Time step(dt): {}".format(self.dt))
 
@@ -239,28 +245,28 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         return self.action_lower_bounds_actual + (act + 1)/2.0 * (self.action_upper_bounds_actual - self.action_lower_bounds_actual)
 
     def step(self, action, restore=False):
-        # if self.timestep%1000==0: print(np.array(action))
         if self.timestep == 0: self.action_filter.init_history(action)
         if self.lpf_action: action_filtered = self.action_filter.filter(action)
         else: action_filtered = np.copy(action)
-
+        action_filtered[6] = 0
+        action_filtered[7] = 0
         self.do_simulation(action_filtered, self.frame_skip)
         if self.render_mode == "human": self.render()
 
         obs = self._get_obs()
         if self.is_history: obs_curr = obs[84:] # self.data.sensordata
         else: obs_curr = obs
-        reward, reward_dict = self._get_reward(action, obs_curr)
+        reward, reward_dict = self._get_reward(action_filtered, obs_curr)
         self.info["reward_dict"] = reward_dict
 
         self._update_data(step=True)
-        self.last_act = action
+        self.last_act = action_filtered
         terminated = self._terminated(obs_curr)
         if self.is_rs_reward and (not self.is_transfer): reward += int(not terminated)
         truncated = self._truncated()
         
-        if terminated: print(self.last_act)
-        if self.is_plotting_joint and self.timestep==500: self._plot_joint() # Plot recorded data
+        if terminated: print(self.last_act[2:])
+        if self.is_plotting_joint and self.timestep == 500: self._plot_joint() # Plot recorded data
         
         return obs, reward, terminated, truncated, self.info
     
@@ -308,7 +314,7 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         self.data.actuator("J5_angle").ctrl[0] = J5_d
         self.data.actuator("J6_angle").ctrl[0] = J6_d
         # NOTE: Record joint angles
-        self._record_joint(_J5=_J5, _J6=_J6)
+        if self.timestep < 500: self._record_joint(_J5=_J5, _J6=_J6)
 
     def _record_joint(self, _J5, _J6):
         J5 = self.data.qpos[self.posID_dic["L3"]] + np.deg2rad(11.345825599281223) # Get angle from mujoco
@@ -389,9 +395,9 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
 
         w_position         = 10.0
         w_velocity         = 1.0
-        w_angular_velocity = 5.0
-        w_orientation      = 5.0
-        w_input            = 1.0
+        w_angular_velocity = 1.0
+        w_orientation      = 1.0
+        w_input            = 0.1
         w_delta_act        = 0.1
 
         reward_weights = np.array([w_position, w_velocity, w_angular_velocity, w_orientation, w_input, w_delta_act])
@@ -404,21 +410,21 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         scale_input     = 1.0 # action already normalized
         scale_delta_act = 1.0
 
-        desired_pos_norm     = np.array([0.0,0.0,2.0])/5 # x y z 
-        desired_vel_norm     = np.array([0.0,0.0,0.0])/self.speed_bound # vx vy vz
-        desired_ang_vel_norm = np.array([0.0,0.0,0.0])/10 # \omega_x \omega_y \omega_z
-        desired_ori_norm     = np.array([0.0,0.0,0.0])/np.pi # roll, pitch, yaw
+        desired_pos_norm     = np.array([0.0,0.0,2.0]) # x y z 
+        desired_vel_norm     = np.array([0.0,0.0,0.0]) # vx vy vz
+        desired_ang_vel_norm = np.array([0.0,0.0,0.0]) # \omega_x \omega_y \omega_z
+        desired_ori_norm     = np.array([0.0,0.0,0.0]) # roll, pitch, yaw
         
-        current_pos_norm     = obs_curr[0:3]/5 # [-5,5] -> [-1,1]
-        current_vel_norm     = obs_curr[7:10]/self.speed_bound # [-5,5] -> [-1,1]
-        current_ang_vel_norm = obs_curr[10:13]/10 # [-10,10] -> [-1,1]
-        current_ori_norm     = quat2euler_raw(obs_curr[3:7])/np.pi
+        current_pos_norm     = obs_curr[0:3]
+        current_vel_norm     = obs_curr[7:10]
+        current_ang_vel_norm = obs_curr[10:13]
+        current_ori_norm     = quat2euler_raw(obs_curr[3:7])
 
-        pos_err       = np.linalg.norm(current_pos_norm - desired_pos_norm) + np.abs(current_pos_norm[2]-desired_pos_norm[2]) # [0,1]
-        if self.is_transfer: pos_err += np.linalg.norm(current_pos_norm[0:2] - desired_pos_norm[0:2]) # Extra penalize x,y error
-        vel_err       = np.linalg.norm(current_vel_norm - desired_vel_norm) # [0,1]
-        ang_vel_err   = np.linalg.norm(current_ang_vel_norm - desired_ang_vel_norm) # [0,1]
-        ori_err       = np.linalg.norm(current_ori_norm - desired_ori_norm) # [0,1]
+        pos_err       = np.linalg.norm(current_pos_norm - desired_pos_norm)
+        if self.is_transfer: pos_err += (np.linalg.norm(current_pos_norm[0:2] - desired_pos_norm[0:2]) + np.abs(current_pos_norm[2]-desired_pos_norm[2])) # Extra penalize pos error
+        vel_err       = np.linalg.norm(current_vel_norm - desired_vel_norm)
+        ang_vel_err   = np.linalg.norm(current_ang_vel_norm - desired_ang_vel_norm)
+        ori_err       = np.linalg.norm(current_ori_norm - desired_ori_norm)
         input_err     = np.linalg.norm(action) # It's not an error but let's just call it
         delta_act_err = np.linalg.norm(action - self.last_act) # It's not an error but let's just call it
 
