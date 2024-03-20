@@ -21,13 +21,11 @@ eval_callback = EvalCallback(env,
                              best_model_save_path=save_path,
                              verbose=1)
 
-# NOTE: if is_history: use 128
-# net_arch = {'pi': [512,256,256,128],
-#             'vf': [512,256,256,128]}
-# net_arch = {'pi': [64,128,128,64],
-#             'vf': [64,128,128,64]}
-net_arch = {'pi': [64,64,64],
-            'vf': [64,64,64]}
+# NOTE: if is_history: use 128 or more
+net_arch = {'pi': [256,128,128,64],
+            'vf': [256,128,128,64]}
+# net_arch = {'pi': [64,64,64],
+#             'vf': [64,64,64]}
 
 def linear_schedule(initial_value):
     if isinstance(initial_value, str):

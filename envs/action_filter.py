@@ -134,8 +134,7 @@ class ActionFilterButter(ActionFilter):
     self.highcut = ([float(x) for x in highcut]
                     if highcut is not None else [ACTION_FILTER_HIGH_CUT])
     if len(self.lowcut) != len(self.highcut):
-      raise ValueError('Number of lowcut and highcut filter values should '
-                       'be the same')
+      raise ValueError('Number of lowcut and highcut filter values should be the same')
 
     if sampling_rate is None:
       raise ValueError('sampling_rate should be provided.')
