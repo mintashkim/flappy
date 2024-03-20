@@ -38,7 +38,6 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         debug         = False,
         lpf_action    = True,
         traj_type     = False,
-        # MujocoEnv
         # xml_file: str = "../assets/Flappy_v8_FixedAxis.xml",
         xml_file: str = "../assets/Flappy_v8_JointInput.xml",
         # xml_file: str = "../assets/Flappy_v8_Base.xml",
@@ -62,22 +61,19 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         self.policy_freq: int      = int(1.0/self.secs_per_env_step) # 1000/33 = 30Hz
         # self.xa = np.zeros(3*self.p.n_Wagner)
         # endregion 
-
         self.model = mj.MjModel.from_xml_path(xml_file)
         self.model.opt.timestep = self.dt
         self.data = mj.MjData(self.model)
 
-        # Frequency
-        self.max_timesteps         = max_timesteps
-        self.timestep: int         = 0
-
+        self.max_timesteps      = max_timesteps
+        self.timestep: int      = 0
         self.randomize          = randomize
         self.debug              = debug
         self.traj_type          = traj_type
         self.noisy              = False
         self.randomize_dynamics = False # True to randomize dynamics
         self.lpf_action         = lpf_action # Low Pass Filter
-        
+        # Booleans
         self.is_visual          = is_visual
         self.is_transfer        = is_transfer
         self.is_plotting_joint  = False
@@ -85,8 +81,7 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         self.is_launch_control  = False
         self.is_action_bound    = False
         self.is_rs_reward       = False # Rich-Sutton Reward
-        self.is_io_history      = False
-
+        self.is_io_history      = True
         # Observation, need to be reduce later for smoothness
         self.n_state            = 84 # NOTE: change to the number of states *we can measure*
         self.n_action           = 8  # NOTE: change to the number of action
@@ -99,12 +94,10 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         self.action_space       = self._set_action_space()
         self.observation_space  = self._set_observation_space()
         self.num_episode        = 0
-
         # NOTE: the low & high does not actually limit the actions output from MLP network, manually clip instead
         self.pos_lb = np.array([-5,-5,0.5]) # fight space dimensions: xyz(m)
         self.pos_ub = np.array([5,5,5])
         self.speed_bound = 10.0
-
         # MujocoEnv
         self.body_list = ["Base","L1","L2","L3","L4","L5","L6","L7","L1R","L2R","L3R","L4R","L5R","L6R","L7R"]
         self.joint_list = ['J1','J2','J3','J5','J6','J7','J10','J1R','J2R','J3R','J5R','J6R','J7R','J10R']
