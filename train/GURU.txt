@@ -1,5 +1,5 @@
 1. Observation Space
-- Sensor data (13) + Joint Angle 5, 6 (2) = (15,)
+- Sensor data (13) + Joint Angle 5,6 (2) = (15,)
 
 2. Action Space
 - Hovering Action Bound: ctrl[6:] = [0, 0]

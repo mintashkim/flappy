@@ -10,7 +10,7 @@ from envs.flappy_env_joint_input import FlappyEnv
 
 
 log_path = os.path.join('logs')
-save_path = os.path.join('saved_models/saved_models_PPO_17')
+save_path = os.path.join('saved_models/saved_models_PPO_18')
 
 def create_env():
     env = FlappyEnv(render_mode="human")
@@ -54,7 +54,7 @@ model = PPO('MlpPolicy',
             tensorboard_log=log_path,
             device='mps')
 
-model.learn(total_timesteps=1e+7, # The total number of samples (env steps) to train on
+model.learn(total_timesteps=1e+8, # The total number of samples (env steps) to train on
             progress_bar=True,
             callback=eval_callback)
 

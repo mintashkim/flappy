@@ -402,7 +402,7 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
     def _get_reward(self, action, obs_curr):
         names = ['position_error', 'velocity_error', 'angular_velocity', 'orientation_error', 'input', 'delta_acs']
 
-        w_position         = 10.0
+        w_position         = np.average(self.previous_epi_len)//1000 + 5 # Focus on position more, after it can fly a bit
         w_velocity         = 1.0
         w_angular_velocity = 1.0
         w_orientation      = 1.0
