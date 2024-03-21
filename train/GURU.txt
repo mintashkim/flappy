@@ -1,0 +1,36 @@
+1. Observation Space
+- Sensor data (13) + Joint Angle 5, 6 (2) = (15,)
+
+2. Action Space
+- Hovering Action Bound: ctrl[6:] = [0, 0]
+
+3. I/O History
+- Short(4) Obs, Action History: (107,)
+
+4. Reward Shaping
+- Rich-Sutton Reward: +0.1
+- Early Termination Penalty: if terminated and self.timestep < (np.average(self.previous_epi_len)//1000+1)*1000: reward -= 10
+
+
+5. Network Architecture
+net_arch = {'pi': [128,128,128],
+            'vf': [128,128,128]}
+
+6. PPO HP
+model = PPO('MlpPolicy', 
+            env=env,
+            learning_rate=3e-4,
+            n_steps=2048, # The number of steps to run for each environment per update / 2048
+            batch_size=256,
+            gamma=0.99,  # 0.99 # look forward 1.65s
+            gae_lambda=0.95,
+            clip_range=linear_schedule(0.2),
+            ent_coef=0.01, # Makes PPO explore
+            verbose=1,
+            policy_kwargs={'net_arch':net_arch},
+            tensorboard_log=log_path,
+            device='mps')
+
+model.learn(total_timesteps=1e+8, # The total number of samples (env steps) to train on
+            progress_bar=True,
+            callback=eval_callback)

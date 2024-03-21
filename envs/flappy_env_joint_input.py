@@ -59,6 +59,7 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         self.num_sims_per_env_step = self.sim_freq // self.policy_freq # 2000//30 = 66
         self.secs_per_env_step     = self.num_sims_per_env_step / self.sim_freq # 66/2000 = 0.033s
         self.policy_freq: int      = int(1.0/self.secs_per_env_step) # 1000/33 = 30Hz
+        self.num_step_per_sec      = int(1.0/self.dt) # 1000
         # self.xa = np.zeros(3*self.p.n_Wagner)
         # endregion 
         self.model = mj.MjModel.from_xml_path(xml_file)
@@ -268,9 +269,7 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         truncated = self._truncated()
         # 7. ETC
         if self.is_plotting_joint and self.timestep == 500: self._plot_joint() # Plot recorded data
-        if terminated 
-           if 0 <= np.average(self.previous_epi_len) <= 1000 and self.timestep < 1000: reward -= 10 # Early Termination Penalty
-           if 0 <= np.average(self.previous_epi_len) <= 1000 and self.timestep < 1000: reward -= 10
+        if terminated and self.timestep < (np.average(self.previous_epi_len)//1000+1)*1000: reward -= 10 # Early Termination Penalty
         # if terminated:
             # print("Episode terminated")
             # print("Last action: {}".format(np.round(self.last_act[2:],2)))
@@ -451,10 +450,12 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         if not((pos <= self.pos_ub).all() 
            and (pos >= self.pos_lb).all()):
             self.num_episode += 1
+            self.previous_epi_len.append(self.timestep)
             print("Episode {epi}  |  Out of position bounds: {pos}  |  Timestep: {timestep}  |  Time: {time}s".format(epi=self.num_episode, pos=np.round(pos,2), timestep=self.timestep, time=round(self.timestep*self.dt,2)))
             return True
         elif not(np.linalg.norm(vel) <= self.speed_bound):
             self.num_episode += 1
+            self.previous_epi_len.append(self.timestep)
             print("Episode {epi}  |  Out of speed bounds: {vel}  |  Timestep: {timestep}  |  Time: {time}s".format(epi=self.num_episode, vel=np.round(vel,2), timestep=self.timestep, time=round(self.timestep*self.dt,2)))
             return True
         else:
