@@ -80,11 +80,11 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         self.is_aero            = False
         self.is_launch_control  = False
         self.is_action_bound    = False
-        self.is_rs_reward       = False # Rich-Sutton Reward
+        self.is_rs_reward       = True # Rich-Sutton Reward
         self.is_io_history      = True
         # Observation, need to be reduce later for smoothness
         self.n_state            = 84 # NOTE: change to the number of states *we can measure*
-        self.n_action           = 8  # NOTE: change to the number of action
+        self.n_action           = 8 # NOTE: change to the number of action
         self.history_len_short  = 4 # NOTE: [o_{t-4}:o_{t}, a_{t-4}:a_{t}], o_{t} = [sensordata, θ_5, θ_6]
         self.history_len_long   = 10
         self.history_len        = self.history_len_short
@@ -263,16 +263,16 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         self.last_act = action_filtered
         # 6. Termination / Truncation
         terminated = self._terminated(obs_curr)
-        if self.is_rs_reward and (not self.is_transfer): reward += int(not terminated)
+        if self.is_rs_reward and (not self.is_transfer): reward += int(not terminated) * 0.1
         truncated = self._truncated()
         # 7. ETC
         if self.is_plotting_joint and self.timestep == 500: self._plot_joint() # Plot recorded data
-        if terminated:
+        if terminated and self.timestep < 1000: reward -= 10 # Early Termination Penalty
+        # if terminated:
             # print("Episode terminated")
             # print("Last action: {}".format(np.round(self.last_act[2:],2)))
             # print("Previous obs: {}".format(np.round(self.previous_obs,2)))
             # print("Previous act: {}".format(np.round(self.previous_act,2)))
-            self.num_episode += 1
 
         return obs, reward, terminated, truncated, self.info
     
@@ -447,10 +447,12 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         vel = np.array(obs_curr[7:10], dtype=float)
         if not((pos <= self.pos_ub).all() 
            and (pos >= self.pos_lb).all()):
-            print("Out of position bounds: {pos}  |  Timestep: {timestep}  |  Time: {time}s".format(pos=np.round(pos,2), timestep=self.timestep, time=round(self.timestep*self.dt,2)))
+            self.num_episode += 1
+            print("Episode {epi}  |  Out of position bounds: {pos}  |  Timestep: {timestep}  |  Time: {time}s".format(epi=self.num_episode, pos=np.round(pos,2), timestep=self.timestep, time=round(self.timestep*self.dt,2)))
             return True
         elif not(np.linalg.norm(vel) <= self.speed_bound):
-            print("Out of speed bounds: {vel}  |  Timestep: {timestep}  |  Time: {time}s".format(vel=np.round(vel,2), timestep=self.timestep, time=round(self.timestep*self.dt,2)))
+            self.num_episode += 1
+            print("Episode {epi}  |  Out of speed bounds: {vel}  |  Timestep: {timestep}  |  Time: {time}s".format(epi=self.num_episode, vel=np.round(vel,2), timestep=self.timestep, time=round(self.timestep*self.dt,2)))
             return True
         else:
             return False

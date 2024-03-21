@@ -9,7 +9,7 @@ from stable_baselines3.common.evaluation import evaluate_policy
 
 env = FlappyEnv(render_mode="human")
 env = VecMonitor(DummyVecEnv([lambda: env]))
-save_path = os.path.join('saved_models/saved_models_PPO_13')
+save_path = os.path.join('saved_models/saved_models_PPO_10')
 loaded_model = PPO.load(save_path+"/best_model")
 
 print("Evaluation start!")
