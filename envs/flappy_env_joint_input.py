@@ -94,6 +94,7 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         self.action_space       = self._set_action_space()
         self.observation_space  = self._set_observation_space()
         self.num_episode        = 0
+        self.previous_epi_len   = deque(maxlen=10)
         # NOTE: the low & high does not actually limit the actions output from MLP network, manually clip instead
         self.pos_lb = np.array([-5,-5,0.5]) # fight space dimensions: xyz(m)
         self.pos_ub = np.array([5,5,5])
@@ -267,7 +268,9 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         truncated = self._truncated()
         # 7. ETC
         if self.is_plotting_joint and self.timestep == 500: self._plot_joint() # Plot recorded data
-        if terminated and self.timestep < 1000: reward -= 10 # Early Termination Penalty
+        if terminated 
+           if 0 <= np.average(self.previous_epi_len) <= 1000 and self.timestep < 1000: reward -= 10 # Early Termination Penalty
+           if 0 <= np.average(self.previous_epi_len) <= 1000 and self.timestep < 1000: reward -= 10
         # if terminated:
             # print("Episode terminated")
             # print("Last action: {}".format(np.round(self.last_act[2:],2)))
