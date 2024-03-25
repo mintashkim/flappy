@@ -229,8 +229,8 @@
     <motor name="Motor2" ctrllimited="true" ctrlrange="0 1" gear="0  0. 0.35 0. 0. -0.0056" site="motor2"/>
     <motor name="Motor3" ctrllimited="true" ctrlrange="0 1" gear="0  0. 0.35 0. 0. -0.0056" site="motor3"/>
     <motor name="Motor4" ctrllimited="true" ctrlrange="0 1" gear="0  0. 0.35 0. 0. -0.0056" site="motor4"/>
-    <motor name="Motor5" ctrllimited="true" ctrlrange="0 .00001" gear="0  0. .1 0. 0.  0.0016" site="motor5"/>
-    <motor name="Motor6" ctrllimited="true" ctrlrange="0 .00001" gear="0  0. -.1 0. 0. -0.0016" site="motor6"/>
+    <motor name="Motor5" ctrllimited="true" ctrlrange="0 1" gear="0  0. .1 0. 0.  0.0016" site="motor5"/>
+    <motor name="Motor6" ctrllimited="true" ctrlrange="0 1" gear="0  0. -.1 0. 0. -0.0016" site="motor6"/>
   </actuator>
 
 </mujoco>

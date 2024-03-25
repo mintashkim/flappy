@@ -22,6 +22,7 @@ from action_filter import ActionFilterButter
 from env_randomize import EnvRandomizer
 from utility_functions import *
 from rotation_transformations import *
+from pid_controller import PID_Controller
 
 
 DEFAULT_CAMERA_CONFIG = {"trackbodyid": 0, "distance": 10.0}
@@ -95,8 +96,8 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         self.action_space       = self._set_action_space()
         self.observation_space  = self._set_observation_space()
         self.num_episode        = 0
-        self.previous_epi_len   = deque(maxlen=10)
-        # NOTE: the low & high does not actually limit the actions output from MLP network, manually clip instead
+        self.previous_epi_len   = deque(maxlen=10); [self.previous_epi_len.append(0) for _ in range(10)]
+        # NOTE: Lower & upper bounds do not actually limit the actions output from MLP network, manually clip instead
         self.pos_lb = np.array([-5,-5,0.5]) # fight space dimensions: xyz(m)
         self.pos_ub = np.array([5,5,5])
         self.speed_bound = 10.0
@@ -120,6 +121,7 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         self.JointAng_ref = [[],[]]
         self.JointVel = [[],[]]
         self.JointVel_ref = [[],[]]
+        # PID Parameters
 
         utils.EzPickle.__init__(self, xml_file, frame_skip, reset_noise_scale, **kwargs)
         MujocoEnv.__init__(self, xml_file, frame_skip, observation_space=self.observation_space, default_camera_config=default_camera_config, **kwargs)
@@ -140,6 +142,8 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         self._seed()
         self.reset()
         self._init_env()
+        self.pid_controller = PID_Controller(self)
+        self.last_pid_ctrl = np.zeros(self.n_action-2)
 
     @property
     def dt(self) -> float:
@@ -173,6 +177,7 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         print("Observation Space: {}".format(np.array(self.observation_space)))
         print("Launch control: {}".format(self.is_launch_control))
         print("Time step(dt): {}".format(self.dt))
+        print("-"*100)
 
     def _init_action_filter(self):
         self.action_filter = ActionFilterButter(
@@ -269,10 +274,12 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         truncated = self._truncated()
         # 7. ETC
         if self.is_plotting_joint and self.timestep == 500: self._plot_joint() # Plot recorded data
-        if terminated and self.timestep < (np.average(self.previous_epi_len)//1000+1)*1000: reward -= 10 # Early Termination Penalty
-        # if terminated:
-            # print("Episode terminated")
-            # print("Last action: {}".format(np.round(self.last_act[2:],2)))
+        if terminated and self.timestep < (np.average(self.previous_epi_len)//1000+1)*1000:
+            reward -= (10 - np.average(self.previous_epi_len)//1000) # Early Termination Penalty
+        if terminated:
+            print("Episode terminated")
+            print("Last action: {}".format(np.round(self.last_act[2:],2)))
+            print("Last PID control: {}".format(np.round(self.last_pid_ctrl,2)))
             # print("Previous obs: {}".format(np.round(self.previous_obs,2)))
             # print("Previous act: {}".format(np.round(self.previous_act,2)))
 
@@ -284,8 +291,13 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         self._step_mujoco_simulation(ctrl, n_frames)
 
     def _step_mujoco_simulation(self, ctrl, n_frames):
-        if self.is_launch_control and self.timestep < 100:
-            ctrl = self._launch_control(ctrl)
+        # NOTE: PID
+        obs = self._get_obs()
+        if self.is_io_history: obs_curr = obs[(self.data.sensordata.shape[0] + self.action_space.shape[0] + 2) * self.history_len :]
+        pid_ctrl = self.pid_controller.control(obs_curr)
+        ctrl[2:] = pid_ctrl
+
+        if self.is_launch_control and self.timestep < 100: ctrl = self._launch_control(ctrl)
         self._apply_control(ctrl=ctrl)
         mj.mj_step(self.model, self.data, nstep=n_frames)
 
@@ -402,14 +414,15 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
     def _get_reward(self, action, obs_curr):
         names = ['position_error', 'velocity_error', 'angular_velocity', 'orientation_error', 'input', 'delta_acs']
 
-        w_position         = np.average(self.previous_epi_len)//1000 + 5 # Focus on position more, after it can fly a bit
+        w_position         = np.average(self.previous_epi_len)//1000 + 5 # Focus on position more as it can fly better
         w_velocity         = 1.0
         w_angular_velocity = 1.0
         w_orientation      = 1.0
         w_input            = 0.1
         w_delta_act        = 0.1
+        w_pid              = 5.0
 
-        reward_weights = np.array([w_position, w_velocity, w_angular_velocity, w_orientation, w_input, w_delta_act])
+        reward_weights = np.array([w_position, w_velocity, w_angular_velocity, w_orientation, w_input, w_delta_act, w_pid])
         weights = reward_weights / np.sum(reward_weights)  # weight can be adjusted later
 
         scale_pos       = 1.0
@@ -418,6 +431,7 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         scale_ori       = 1.0
         scale_input     = 1.0 # action already normalized
         scale_delta_act = 1.0
+        scale_pid       = 1.0
 
         desired_pos_norm     = np.array([0.0,0.0,2.0]) # x y z 
         desired_vel_norm     = np.array([0.0,0.0,0.0]) # vx vy vz
@@ -434,15 +448,25 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         vel_err       = np.linalg.norm(current_vel_norm - desired_vel_norm)
         ang_vel_err   = np.linalg.norm(current_ang_vel_norm - desired_ang_vel_norm)
         ori_err       = np.linalg.norm(current_ori_norm - desired_ori_norm)
-        input_err     = np.linalg.norm(action) # It's not an error but let's just call it
-        delta_act_err = np.linalg.norm(action - self.last_act) # It's not an error but let's just call it
+        input_err     = np.linalg.norm(action[2:]) # It's not an error but let's just call it
+        delta_act_err = np.linalg.norm(action[2:] - self.last_act[2:]) # It's not an error but let's just call it
+        pid_err       = self._get_pid_error(action[2:])
 
-        rewards = np.exp(-np.array([scale_pos, scale_vel, scale_ang_vel, scale_ori, scale_input, scale_delta_act]
-                         * np.array([pos_err, vel_err, ang_vel_err, ori_err, input_err, delta_act_err])))
+        rewards = np.exp(-np.array([scale_pos, scale_vel, scale_ang_vel, scale_ori, scale_input, scale_delta_act, scale_pid]
+                         * np.array([pos_err, vel_err, ang_vel_err, ori_err, input_err, delta_act_err, pid_err])))
         total_reward = np.sum(weights * rewards)
         reward_dict = dict(zip(names, weights * rewards))
 
         return total_reward, reward_dict
+
+    def _get_pid_error(self, action):
+        pid_ctrl = self.pid_controller.control(self.previous_obs[-1]) # PID ctrl for a_t
+        if pid_ctrl is None:
+            pid_err = np.linalg.norm(action - self.last_pid_ctrl)
+        else:
+            pid_err = np.linalg.norm(action - pid_ctrl)
+            self.last_pid_ctrl = pid_ctrl
+        return pid_err
 
     def _terminated(self, obs_curr):
         pos = np.array(obs_curr[0:3], dtype=float)

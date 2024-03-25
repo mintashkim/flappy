@@ -15,7 +15,7 @@ save_path = os.path.join('saved_models/saved_models_PPO_18')
 def create_env():
     env = FlappyEnv(render_mode="human")
     return env
-env = DummyVecEnv([create_env for _ in range(4)])
+env = DummyVecEnv([create_env for _ in range(1)])
 # env = VecMonitor(DummyVecEnv([lambda: env]))
 
 stop_callback = StopTrainingOnRewardThreshold(reward_threshold=20000, verbose=1)
