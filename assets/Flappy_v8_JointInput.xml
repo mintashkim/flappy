@@ -219,12 +219,12 @@
     <position name="J6_angle" joint="J6" ctrllimited="true" ctrlrange="-1.57 1.57" kp="50"/>
 <!--    <velocity name="J5_vel" joint="J5"  kv="1"/>-->
 <!--    <velocity name="J6_vel" joint="J6"  kv="1"/>-->
-    <!-- <motor name="Motor1" ctrllimited="true" ctrlrange="0.4 0.8" gear="0  0. 0.35 0. 0. -0.0056" site="motor1"/> unit: N
-    <motor name="Motor2" ctrllimited="true" ctrlrange="0.4 0.8" gear="0  0. 0.35 0. 0. -0.0056" site="motor2"/>
-    <motor name="Motor3" ctrllimited="true" ctrlrange="0.4 0.8" gear="0  0. 0.35 0. 0. -0.0056" site="motor3"/>
-    <motor name="Motor4" ctrllimited="true" ctrlrange="0.4 0.8" gear="0  0. 0.35 0. 0. -0.0056" site="motor4"/>
-    <motor name="Motor5" ctrllimited="true" ctrlrange="0 0.3" gear="0  0. .1 0. 0.  0.0016" site="motor5"/>
-    <motor name="Motor6" ctrllimited="true" ctrlrange="0 0.3" gear="0  0. -.1 0. 0. -0.0016" site="motor6"/> -->
+    <!-- <motor name="Motor1" ctrllimited="true" ctrlrange="-2 2" gear="0  0. 0.35 0. 0. -0.0056" site="motor1"/> unit: N
+    <motor name="Motor2" ctrllimited="true" ctrlrange="-2 2" gear="0  0. 0.35 0. 0. -0.0056" site="motor2"/>
+    <motor name="Motor3" ctrllimited="true" ctrlrange="-2 2" gear="0  0. 0.35 0. 0. -0.0056" site="motor3"/>
+    <motor name="Motor4" ctrllimited="true" ctrlrange="-2 2" gear="0  0. 0.35 0. 0. -0.0056" site="motor4"/>
+    <motor name="Motor5" ctrllimited="true" ctrlrange="-2 2" gear="0  0. .1 0. 0.  0.0016" site="motor5"/>
+    <motor name="Motor6" ctrllimited="true" ctrlrange="-2 2" gear="0  0. -.1 0. 0. -0.0016" site="motor6"/> -->
     <motor name="Motor1" ctrllimited="true" ctrlrange="0 1" gear="0  0. 0.35 0. 0. -0.0056" site="motor1"/> unit: N
     <motor name="Motor2" ctrllimited="true" ctrlrange="0 1" gear="0  0. 0.35 0. 0. -0.0056" site="motor2"/>
     <motor name="Motor3" ctrllimited="true" ctrlrange="0 1" gear="0  0. 0.35 0. 0. -0.0056" site="motor3"/>

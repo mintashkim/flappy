@@ -37,7 +37,7 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         is_visual     = False,
         randomize     = False,
         debug         = False,
-        lpf_action    = True,
+        lpf_action    = False,
         traj_type     = False,
         # xml_file: str = "../assets/Flappy_v8_FixedAxis.xml",
         xml_file: str = "../assets/Flappy_v8_JointInput.xml",
@@ -72,10 +72,11 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         self.randomize          = randomize
         self.debug              = debug
         self.traj_type          = traj_type
+        
+        # Booleans
         self.noisy              = False
         self.randomize_dynamics = False # True to randomize dynamics
         self.lpf_action         = lpf_action # Low Pass Filter
-        # Booleans
         self.is_visual          = is_visual
         self.is_transfer        = is_transfer
         self.is_plotting_joint  = False
@@ -293,13 +294,13 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
 
     def _step_mujoco_simulation(self, ctrl, n_frames):
         # NOTE: PID ONLY
-        pid_ctrl = self.pid_controller.control(self.data.sensordata)
-        if pid_ctrl is None:
-            pid_ctrl = self.last_pid_ctrl
-        else:
-            self.last_pid_ctrl = pid_ctrl
-        ctrl[2:] = pid_ctrl
-        print(np.round(pid_ctrl,2))
+        # pid_ctrl = self.pid_controller.control(self.data.sensordata)
+        # if pid_ctrl is None:
+        #     pid_ctrl = self.last_pid_ctrl
+        # else:
+        #     self.last_pid_ctrl = pid_ctrl
+        # ctrl[2:] = pid_ctrl
+        # print(np.round(pid_ctrl,2))
 
         if self.is_launch_control and self.timestep < 100: ctrl = self._launch_control(ctrl)
         self._apply_control(ctrl=ctrl)
@@ -464,14 +465,14 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         return total_reward, reward_dict
 
     def _get_pid_error(self, action):
-        # pid_ctrl = self.pid_controller.control(self.previous_obs[-1]) # PID ctrl for o_t
-        print(self.last_pid_ctrl)
-        pid_err = np.linalg.norm(action - self.last_pid_ctrl)
-        # if pid_ctrl is None:
-        #     pid_err = np.linalg.norm(action - self.last_pid_ctrl)
-        # else:
-        #     pid_err = np.linalg.norm(action - pid_ctrl)
-        #     self.last_pid_ctrl = pid_ctrl
+        pid_ctrl = self.pid_controller.control(self.previous_obs[-1]) # PID ctrl for the past obs
+        # print(self.last_pid_ctrl)
+        # pid_err = np.linalg.norm(action - self.last_pid_ctrl)
+        if pid_ctrl is None:
+            pid_err = np.linalg.norm(action - self.last_pid_ctrl)
+        else:
+            pid_err = np.linalg.norm(action - pid_ctrl)
+            self.last_pid_ctrl = pid_ctrl
         return pid_err
 
     def _terminated(self, obs_curr):
