@@ -11,7 +11,7 @@ class PID_Controller:
         # initialize states
         self.x_d = 0
         self.y_d = 0
-        self.z_d = 0.5
+        self.z_d = 2.0
         self.vx_d = 0
         self.vy_d = 0
         self.roll_d = 0
@@ -36,7 +36,7 @@ class PID_Controller:
         self.z_err_prv = 0
 
         self.time_ctrlPos_prv = self.env.timestep * self.env.dt
-        self.time_ctrlAtt_prv = self.env.timestep / self.env.dt
+        self.time_ctrlAtt_prv = self.env.timestep * self.env.dt
 
         # Position Control
         self.Kp_Xh = 1
@@ -45,8 +45,12 @@ class PID_Controller:
         self.points = points
         self.tspans = tspans
 
+    def reset(self):
+        self.time_ctrlPos_prv = self.env.timestep * self.env.dt
+        self.time_ctrlAtt_prv = self.env.timestep * self.env.dt
+
     def control(self, obs):
-        t = self.data.time
+        # t = self.env.timestep * self.env.dt
         # pos_d = trajectory_generator(self.points, self.tspans, t)
         pos_d = np.array([0.0,0.0,2.0])
         self.x_d = pos_d[0]
