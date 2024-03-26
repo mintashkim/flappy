@@ -62,7 +62,7 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         self.policy_freq: int      = int(1.0/self.secs_per_env_step) # 1000/33 = 30Hz
         self.num_step_per_sec      = int(1.0/self.dt) # 1000
         # self.xa = np.zeros(3*self.p.n_Wagner)
-        # endregion 
+        # endregion
         self.model = mj.MjModel.from_xml_path(xml_file)
         self.model.opt.timestep = self.dt
         self.data = mj.MjData(self.model)
