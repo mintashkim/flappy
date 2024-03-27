@@ -57,7 +57,7 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         self.sim_freq: int         = self.sim.freq # NOTE: 2000Hz for hard coding
         # self.dt                    = 1e-3 # NOTE: 1.0 / self.sim_freq = 1/2000s for hard coding
         self.policy_freq: float    = 30.0 # NOTE: 30Hz but the real control frequency might not be exactly 30Hz because we round up the num_sims_per_env_step
-        self.num_sims_per_env_step = self.sim_freq // self.policy_freq # 2000//30 = 66
+        self.num_sims_per_env_step = int(self.sim_freq // self.policy_freq) # 2000//30 = 66
         self.secs_per_env_step     = self.num_sims_per_env_step / self.sim_freq # 66/2000 = 0.033s
         self.policy_freq: int      = int(1.0/self.secs_per_env_step) # 1000/33 = 30Hz
         self.num_step_per_sec      = int(1.0/self.dt) # 1000
@@ -177,7 +177,9 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         print("Actual Action Space: {}".format(np.array(self.action_space)))
         print("Observation Space: {}".format(np.array(self.observation_space)))
         print("Launch control: {}".format(self.is_launch_control))
-        print("Time step(dt): {}".format(self.dt))
+        print("Time step(sec): {}".format(self.dt))
+        print("Policy frequency(Hz): {}".format(self.policy_freq))
+        print("Num sims / Env step: {}".format(self.num_sims_per_env_step))
         print("-"*100)
 
     def _init_action_filter(self):
@@ -257,7 +259,8 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         if self.lpf_action: action_filtered = self.action_filter.filter(action)
         else: action_filtered = np.copy(action)
         # 2. Simulate for Single Time Step
-        self.do_simulation(action_filtered, self.frame_skip) # a_{t}
+        for _ in range(self.num_sims_per_env_step):
+            self.do_simulation(action_filtered, self.frame_skip) # a_{t}
         if self.render_mode == "human": self.render()
         # 3. Get Observation
         obs = self._get_obs() # o_{t+1}
@@ -294,12 +297,12 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
 
     def _step_mujoco_simulation(self, ctrl, n_frames):
         # NOTE: PID ONLY
-        # pid_ctrl = self.pid_controller.control(self.data.sensordata)
-        # if pid_ctrl is None:
-        #     pid_ctrl = self.last_pid_ctrl
-        # else:
-        #     self.last_pid_ctrl = pid_ctrl
-        # ctrl[2:] = pid_ctrl
+        pid_ctrl = self.pid_controller.control(self.data.sensordata)
+        if pid_ctrl is None:
+            pid_ctrl = self.last_pid_ctrl
+        else:
+            self.last_pid_ctrl = pid_ctrl
+        ctrl[2:] = pid_ctrl
         # print(np.round(pid_ctrl,2))
 
         if self.is_launch_control and self.timestep < 100: ctrl = self._launch_control(ctrl)
@@ -434,7 +437,7 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         scale_vel       = 1.0
         scale_ang_vel   = 1.0
         scale_ori       = 1.0
-        scale_input     = 1.0 # action already normalized
+        scale_input     = 1.0
         scale_delta_act = 1.0
         scale_pid       = 1.0
 

@@ -56,7 +56,7 @@ class Simulation_Parameter:
         self.body_init_vel = np.array([2.08, 0, 0]).reshape(3, 1) # initial body velocity (m/s)
 
         # Simulation time parameters
-        self.dt = 5e-4 # simulation time step (s). smaller is more stable but slower
+        self.dt = 1e-3 # simulation time step (s). smaller is more stable but slower
         self.t_end = 10 # simulation end time (s)
         self.wait_time = 0.01 # wait time before start applying flapping speed tracking controller
 
