@@ -37,12 +37,12 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         is_visual     = False,
         randomize     = False,
         debug         = False,
-        lpf_action    = False,
+        is_lpf_action = False,
         traj_type     = False,
         # xml_file: str = "../assets/Flappy_v8_FixedAxis.xml",
         xml_file: str = "../assets/Flappy_v8_JointInput.xml",
         # xml_file: str = "../assets/Flappy_v8_Base.xml",
-        frame_skip: int = 1,
+        frame_skip: int = 4,
         default_camera_config: Dict[str, Union[float, int]] = DEFAULT_CAMERA_CONFIG,
         reset_noise_scale: float = 0.01,
         is_transfer = False,
@@ -74,9 +74,9 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         self.traj_type          = traj_type
         
         # Booleans
-        self.noisy              = False
-        self.randomize_dynamics = False # True to randomize dynamics
-        self.lpf_action         = lpf_action # Low Pass Filter
+        self.is_noisy           = False
+        self.is_random_dynamics = False # True to randomize dynamics
+        self.is_lpf_action      = is_lpf_action # Low Pass Filter
         self.is_visual          = is_visual
         self.is_transfer        = is_transfer
         self.is_plotting_joint  = False
@@ -85,6 +85,8 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         self.is_action_bound    = False
         self.is_rs_reward       = True # Rich-Sutton Reward
         self.is_io_history      = True
+        self.is_pid             = True
+
         # Observation, need to be reduce later for smoothness
         self.n_state            = 84 # NOTE: change to the number of states *we can measure*
         self.n_action           = 8 # NOTE: change to the number of action
@@ -98,15 +100,18 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         self.observation_space  = self._set_observation_space()
         self.num_episode        = 0
         self.previous_epi_len   = deque(maxlen=10); [self.previous_epi_len.append(0) for _ in range(10)]
+        
         # NOTE: Lower & upper bounds do not actually limit the actions output from MLP network, manually clip instead
         self.pos_lb = np.array([-5,-5,0.5]) # fight space dimensions: xyz(m)
         self.pos_ub = np.array([5,5,5])
         self.speed_bound = 10.0
+        
         # MujocoEnv
         self.body_list = ["Base","L1","L2","L3","L4","L5","L6","L7","L1R","L2R","L3R","L4R","L5R","L6R","L7R"]
         self.joint_list = ['J1','J2','J3','J5','J6','J7','J10','J1R','J2R','J3R','J5R','J6R','J7R','J10R']
         self.bodyID_dic, self.jntID_dic, self.posID_dic, self.jvelID_dic = self.get_bodyIDs(self.body_list)
         self.jID_dic = self.get_jntIDs(self.joint_list)
+        
         # Joint Input
         self.Angle_data = pd.read_csv("../assets/JointAngleData.csv", header=None)
         self.J5_m = self.Angle_data.loc[:,0]  # Mujoco reference joint angle (θ_5)
@@ -115,6 +120,7 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         self.J6v_m = self.sim.flapping_freq/2 * self.Angle_data.loc[:,3]  # Mujoco reference joint angle velocity (θ_6_dot)
         self.t_m = np.linspace(0, 1.0/self.sim.flapping_freq, num=len(self.J5_m))
         self.joint_5_6 = np.zeros(2)
+        
         # Record Structure for Early Stage
         self.SimTime = []
         self.ua_ = []
@@ -122,7 +128,6 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         self.JointAng_ref = [[],[]]
         self.JointVel = [[],[]]
         self.JointVel_ref = [[],[]]
-        # PID Parameters
 
         utils.EzPickle.__init__(self, xml_file, frame_skip, reset_noise_scale, **kwargs)
         MujocoEnv.__init__(self, xml_file, frame_skip, observation_space=self.observation_space, default_camera_config=default_camera_config, **kwargs)
@@ -234,7 +239,7 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         self.env_randomizer = EnvRandomizer(self.sim)
 
     def _set_dynamics_properties(self):
-        if self.randomize_dynamics:
+        if self.is_random_dynamics:
             self.sim.set_dynamics()
 
     def _get_obs(self):
@@ -256,26 +261,26 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
     def step(self, action, restore=False):
         # 1. Action Filer
         if self.timestep == 0: self.action_filter.init_history(action)
-        if self.lpf_action: action_filtered = self.action_filter.filter(action)
+        if self.is_lpf_action: action_filtered = self.action_filter.filter(action)
         else: action_filtered = np.copy(action)
         # 2. Simulate for Single Time Step
-        for _ in range(self.num_sims_per_env_step):
-            self.do_simulation(action_filtered, self.frame_skip) # a_{t}
+        # for _ in range(self.num_sims_per_env_step):
+        self.do_simulation(action_filtered, self.frame_skip) # a_{t}
         if self.render_mode == "human": self.render()
         # 3. Get Observation
         obs = self._get_obs() # o_{t+1}
         if self.is_io_history: obs_curr = obs[(self.data.sensordata.shape[0] + self.action_space.shape[0] + 2) * self.history_len :]
         else: obs_curr = obs
-        # 4. Update Data
-        self._update_data(step=True, obs_curr=obs_curr, action=action_filtered)
-        self.last_act = action_filtered
-        # 5. Get Reward
+        # 4. Get Reward
         reward, reward_dict = self._get_reward(action_filtered, obs_curr)
         self.info["reward_dict"] = reward_dict
-        # 6. Termination / Truncation
+        # 5. Termination / Truncation
         terminated = self._terminated(obs_curr)
         if self.is_rs_reward and (not self.is_transfer): reward += int(not terminated) * 0.1
         truncated = self._truncated()
+        # 6. Update Data
+        self._update_data(step=True, obs_curr=obs_curr, action=action_filtered)
+        self.last_act = action_filtered
         # 7. ETC
         if self.is_plotting_joint and self.timestep == 500: self._plot_joint() # Plot recorded data
         if terminated and self.timestep < (np.average(self.previous_epi_len)//1000+1)*1000:
@@ -296,22 +301,30 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         self._step_mujoco_simulation(ctrl, n_frames)
 
     def _step_mujoco_simulation(self, ctrl, n_frames):
-        # NOTE: PID ONLY
+        # NOTE: PID ONLY: 100Hz
+        pid_ctrl = self.pid_controller.control(self.data.sensordata)
+        if pid_ctrl is None:
+            pid_ctrl = self.last_pid_ctrl
+        else:
+            self.last_pid_ctrl = pid_ctrl
+        # ctrl[2:] = pid_ctrl
+        # print(np.round(pid_ctrl,2))
+
+        if self.is_launch_control and self.timestep < 1000: ctrl = self._launch_control(ctrl)
+        self._apply_control(ctrl=ctrl)
+        mj.mj_step(self.model, self.data, nstep=n_frames)
+
+    def _launch_control(self, ctrl):
+        # NOTE: Emperical
+        # ctrl[2:6] = np.array([0.6,0.6,0.6,0.6])
+        # ctrl[6:] = np.array([0.0,0.0])
+        # NOTE: PID ONLY: 100Hz
         pid_ctrl = self.pid_controller.control(self.data.sensordata)
         if pid_ctrl is None:
             pid_ctrl = self.last_pid_ctrl
         else:
             self.last_pid_ctrl = pid_ctrl
         ctrl[2:] = pid_ctrl
-        # print(np.round(pid_ctrl,2))
-
-        if self.is_launch_control and self.timestep < 100: ctrl = self._launch_control(ctrl)
-        self._apply_control(ctrl=ctrl)
-        mj.mj_step(self.model, self.data, nstep=n_frames)
-
-    def _launch_control(self, ctrl):
-        ctrl[2:6] = np.array([0.6,0.6,0.6,0.6])
-        ctrl[6:] = np.array([0.0,0.0])
         return ctrl
 
     def _apply_control(self, ctrl):
@@ -339,6 +352,7 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         J5_d = _J5 - np.deg2rad(11.345825599281223)  # convert to Mujoco Reference
         J6_d = _J6 + np.deg2rad(27.45260202) - _J5
         # Apply angles to Joints
+        J5_d, J6_d = 0, 0
         self.data.actuator("J5_angle").ctrl[0] = J5_d
         self.data.actuator("J6_angle").ctrl[0] = J6_d
         # NOTE: Record joint angles
@@ -422,7 +436,7 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
     def _get_reward(self, action, obs_curr):
         names = ['position_error', 'velocity_error', 'angular_velocity', 'orientation_error', 'input', 'delta_acs']
 
-        w_position         = np.average(self.previous_epi_len)//1000 + 5 # Focus on position more as it can fly better
+        w_position         = np.average(self.previous_epi_len)//1000 + 10 # Focus on position more as it can fly better
         w_velocity         = 1.0
         w_angular_velocity = 1.0
         w_orientation      = 1.0
