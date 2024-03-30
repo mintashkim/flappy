@@ -10,15 +10,15 @@ from envs.flappy_env_joint_input import FlappyEnv
 
 
 log_path = os.path.join('logs')
-save_path = os.path.join('saved_models/saved_models_PPO_21')
+save_path = os.path.join('saved_models/saved_models_PPO_22')
 
 def create_env():
     env = FlappyEnv(render_mode="human")
     return env
-env = DummyVecEnv([create_env for _ in range(4)])
+env = VecMonitor(DummyVecEnv([create_env for _ in range(1)]))
 # env = VecMonitor(DummyVecEnv([lambda: env]))
 
-stop_callback = StopTrainingOnRewardThreshold(reward_threshold=20000, verbose=1)
+stop_callback = StopTrainingOnRewardThreshold(reward_threshold=10000, verbose=1)
 eval_callback = EvalCallback(env,
                              callback_on_new_best=stop_callback,
                              eval_freq=10000,
@@ -26,12 +26,12 @@ eval_callback = EvalCallback(env,
                              verbose=1)
 
 # NOTE: if is_history: use 128 or more
-net_arch = {'pi': [128,128,128],
-            'vf': [128,128,128]}
+# net_arch = {'pi': [128,128,128],
+#             'vf': [128,128,128]}
 # net_arch = {'pi': [256,128,128,64],
 #             'vf': [256,128,128,64]}
-# net_arch = {'pi': [64,64,64],
-#             'vf': [64,64,64]}
+net_arch = {'pi': [64,64,64],
+            'vf': [64,64,64]}
 
 def linear_schedule(initial_value):
     if isinstance(initial_value, str):

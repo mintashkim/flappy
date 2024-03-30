@@ -37,17 +37,20 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         is_visual     = False,
         randomize     = False,
         debug         = False,
-        is_lpf_action = False,
+        is_lpf_action = True,
         traj_type     = False,
         # xml_file: str = "../assets/Flappy_v8_FixedAxis.xml",
         xml_file: str = "../assets/Flappy_v8_JointInput.xml",
         # xml_file: str = "../assets/Flappy_v8_Base.xml",
-        frame_skip: int = 4,
+        frame_skip: int = 1,
         default_camera_config: Dict[str, Union[float, int]] = DEFAULT_CAMERA_CONFIG,
         reset_noise_scale: float = 0.01,
         is_transfer = False,
         **kwargs
     ):
+        self.model = mj.MjModel.from_xml_path(xml_file)
+        # self.model.opt.timestep = self.dt
+        self.data = mj.MjData(self.model)
         
         # NOTE: Parameters for Hard-Coded Version
         # region
@@ -56,6 +59,7 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         self.sim = Flappy(p=self.p, render=is_visual)
         self.sim_freq: int         = self.sim.freq # NOTE: 2000Hz for hard coding
         # self.dt                    = 1e-3 # NOTE: 1.0 / self.sim_freq = 1/2000s for hard coding
+        self.frame_skip = frame_skip
         self.policy_freq: float    = 30.0 # NOTE: 30Hz but the real control frequency might not be exactly 30Hz because we round up the num_sims_per_env_step
         self.num_sims_per_env_step = int(self.sim_freq // self.policy_freq) # 2000//30 = 66
         self.secs_per_env_step     = self.num_sims_per_env_step / self.sim_freq # 66/2000 = 0.033s
@@ -63,9 +67,6 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         self.num_step_per_sec      = int(1.0/self.dt) # 1000
         # self.xa = np.zeros(3*self.p.n_Wagner)
         # endregion
-        self.model = mj.MjModel.from_xml_path(xml_file)
-        self.model.opt.timestep = self.dt
-        self.data = mj.MjData(self.model)
 
         self.max_timesteps      = max_timesteps
         self.timestep: int      = 0
@@ -83,9 +84,9 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         self.is_aero            = False
         self.is_launch_control  = False
         self.is_action_bound    = False
-        self.is_rs_reward       = True # Rich-Sutton Reward
-        self.is_io_history      = True
-        self.is_pid             = True
+        self.is_rs_reward       = False # Rich-Sutton Reward
+        self.is_io_history      = False
+        self.is_pid             = False
 
         # Observation, need to be reduce later for smoothness
         self.n_state            = 84 # NOTE: change to the number of states *we can measure*
@@ -102,8 +103,8 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         self.previous_epi_len   = deque(maxlen=10); [self.previous_epi_len.append(0) for _ in range(10)]
         
         # NOTE: Lower & upper bounds do not actually limit the actions output from MLP network, manually clip instead
-        self.pos_lb = np.array([-5,-5,0.5]) # fight space dimensions: xyz(m)
-        self.pos_ub = np.array([5,5,5])
+        self.pos_lb = np.array([-10,-10,0.5]) # fight space dimensions: xyz(m)
+        self.pos_ub = np.array([10,10,10])
         self.speed_bound = 10.0
         
         # MujocoEnv
@@ -153,7 +154,7 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
 
     @property
     def dt(self) -> float:
-        return 1e-3
+        return self.model.opt.timestep * self.frame_skip
 
     def _set_action_space(self):
         bounds = self.model.actuator_ctrlrange.copy().astype(np.float32)
@@ -276,13 +277,13 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         self.info["reward_dict"] = reward_dict
         # 5. Termination / Truncation
         terminated = self._terminated(obs_curr)
-        if self.is_rs_reward and (not self.is_transfer): reward += int(not terminated) * 0.1
+        # if self.is_rs_reward and (not self.is_transfer): reward += int(not terminated) * 0.1
         truncated = self._truncated()
         # 6. Update Data
         self._update_data(step=True, obs_curr=obs_curr, action=action_filtered)
         self.last_act = action_filtered
         # 7. ETC
-        if self.is_plotting_joint and self.timestep == 500: self._plot_joint() # Plot recorded data
+        # if self.is_plotting_joint and self.timestep == 500: self._plot_joint() # Plot recorded data
         if terminated and self.timestep < (np.average(self.previous_epi_len)//1000+1)*1000:
             reward -= (10 - np.average(self.previous_epi_len)//1000) # Early Termination Penalty
         if terminated:
@@ -302,11 +303,11 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
 
     def _step_mujoco_simulation(self, ctrl, n_frames):
         # NOTE: PID ONLY: 100Hz
-        pid_ctrl = self.pid_controller.control(self.data.sensordata)
-        if pid_ctrl is None:
-            pid_ctrl = self.last_pid_ctrl
-        else:
-            self.last_pid_ctrl = pid_ctrl
+        # pid_ctrl = self.pid_controller.control(self.data.sensordata)
+        # if pid_ctrl is None:
+        #     pid_ctrl = self.last_pid_ctrl
+        # else:
+        #     self.last_pid_ctrl = pid_ctrl
         # ctrl[2:] = pid_ctrl
         # print(np.round(pid_ctrl,2))
 
@@ -352,7 +353,7 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         J5_d = _J5 - np.deg2rad(11.345825599281223)  # convert to Mujoco Reference
         J6_d = _J6 + np.deg2rad(27.45260202) - _J5
         # Apply angles to Joints
-        J5_d, J6_d = 0, 0
+        # J5_d, J6_d = 0, 0
         self.data.actuator("J5_angle").ctrl[0] = J5_d
         self.data.actuator("J6_angle").ctrl[0] = J6_d
         # NOTE: Record joint angles
@@ -436,60 +437,63 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
     def _get_reward(self, action, obs_curr):
         names = ['position_error', 'velocity_error', 'angular_velocity', 'orientation_error', 'input', 'delta_acs']
 
-        w_position         = np.average(self.previous_epi_len)//1000 + 10 # Focus on position more as it can fly better
+        w_position         = np.average(self.previous_epi_len)//1000 + 0.5 # Focus on position more as it can fly better
         w_velocity         = 1.0
-        w_angular_velocity = 1.0
-        w_orientation      = 1.0
-        w_input            = 0.1
-        w_delta_act        = 0.1
-        w_pid              = 5.0
+        w_angular_velocity = 10.0
+        w_orientation      = 10.0
+        w_input            = 0.5
+        w_delta_act        = 0.5
+        w_pid              = 1.0
 
         reward_weights = np.array([w_position, w_velocity, w_angular_velocity, w_orientation, w_input, w_delta_act, w_pid])
         weights = reward_weights / np.sum(reward_weights)  # weight can be adjusted later
 
-        scale_pos       = 1.0
-        scale_vel       = 1.0
-        scale_ang_vel   = 1.0
+        scale_pos       = 2.0
         scale_ori       = 1.0
-        scale_input     = 1.0
+        scale_vel       = 2.0
+        scale_ang_vel   = 2.0
+        scale_input     = 6.0
         scale_delta_act = 1.0
         scale_pid       = 1.0
 
-        desired_pos_norm     = np.array([0.0,0.0,2.0]) # x y z 
-        desired_vel_norm     = np.array([0.0,0.0,0.0]) # vx vy vz
-        desired_ang_vel_norm = np.array([0.0,0.0,0.0]) # \omega_x \omega_y \omega_z
-        desired_ori_norm     = np.array([0.0,0.0,0.0]) # roll, pitch, yaw
+        desired_pos     = np.array([0.0,0.0,2.0]) # x y z 
+        desired_ori     = np.array([1.0,0.0,0.0,0.0]) # roll, pitch, yaw
+        desired_vel     = np.array([0.0,0.0,0.0]) # vx vy vz
+        desired_ang_vel = np.array([0.0,0.0,0.0]) # \omega_x \omega_y \omega_z
         
         current_pos     = obs_curr[0:3]
+        current_ori     = obs_curr[3:7]
         current_vel     = obs_curr[7:10]
         current_ang_vel = obs_curr[10:13]
-        current_ori     = quat2euler_raw(obs_curr[3:7])
 
-        pos_err       = np.linalg.norm(current_pos - desired_pos_norm)
-        if self.is_transfer: pos_err += (np.linalg.norm(current_pos[0:2] - desired_pos_norm[0:2]) + np.abs(current_pos[2]-desired_pos_norm[2])) # Extra penalize pos error
-        vel_err       = np.linalg.norm(current_vel - desired_vel_norm)
-        ang_vel_err   = np.linalg.norm(current_ang_vel - desired_ang_vel_norm)
-        ori_err       = np.linalg.norm(current_ori - desired_ori_norm)
+        print(action)
+
+        pos_err       = np.linalg.norm(current_pos - desired_pos)
+        # if self.is_transfer: pos_err += (np.linalg.norm(current_pos[0:2] - desired_pos[0:2]) + np.abs(current_pos[2]-desired_pos[2])) # Extra penalize pos error
+        ori_err       = np.linalg.norm(current_ori - desired_ori)
+        vel_err       = np.linalg.norm(current_vel - desired_vel)
+        ang_vel_err   = np.linalg.norm(current_ang_vel - desired_ang_vel)
         input_err     = np.linalg.norm(action[2:]) # It's not an error but let's just call it
         delta_act_err = np.linalg.norm(action[2:] - self.last_act[2:]) # It's not an error but let's just call it
         pid_err       = self._get_pid_error(action[2:])
 
-        rewards = np.exp(-np.array([scale_pos, scale_vel, scale_ang_vel, scale_ori, scale_input, scale_delta_act, scale_pid]
-                         * np.array([pos_err, vel_err, ang_vel_err, ori_err, input_err, delta_act_err, pid_err])))
+        rewards = np.exp(-np.array([scale_pos, scale_ori, scale_vel, scale_ang_vel, scale_input, scale_delta_act, scale_pid]
+                         * np.array([pos_err, ori_err, vel_err, ang_vel_err, input_err, delta_act_err, pid_err])))
         total_reward = np.sum(weights * rewards)
         reward_dict = dict(zip(names, weights * rewards))
 
         return total_reward, reward_dict
 
     def _get_pid_error(self, action):
-        pid_ctrl = self.pid_controller.control(self.previous_obs[-1]) # PID ctrl for the past obs
-        # print(self.last_pid_ctrl)
-        # pid_err = np.linalg.norm(action - self.last_pid_ctrl)
-        if pid_ctrl is None:
-            pid_err = np.linalg.norm(action - self.last_pid_ctrl)
+        if self.is_pid:
+            pid_ctrl = self.pid_controller.control(self.previous_obs[-1]) # PID ctrl for the past obs
+            if pid_ctrl is None:
+                pid_err = np.linalg.norm(action - self.last_pid_ctrl)
+            else:
+                pid_err = np.linalg.norm(action - pid_ctrl)
+                self.last_pid_ctrl = pid_ctrl
         else:
-            pid_err = np.linalg.norm(action - pid_ctrl)
-            self.last_pid_ctrl = pid_ctrl
+            pid_err = 0
         return pid_err
 
     def _terminated(self, obs_curr):
