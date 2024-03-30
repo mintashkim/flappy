@@ -18,9 +18,9 @@ class Trajectory(object):
     def plot(self):
         T = np.linspace(0, self._tf, 100)
 
-        x = np.empty((0, 3))
-        v = np.empty((0, 3))
-        a = np.empty((0, 3))
+        x = np.empty((0,3))
+        v = np.empty((0,3))
+        a = np.empty((0,3))
         for t in T:
             x_, v_, a_ = self.get(t)
             x = np.append(x, np.array([x_]), axis=0)
@@ -29,7 +29,6 @@ class Trajectory(object):
 
         plt.figure()
         plt.subplot(311)
-        plt.style.use('seaborn-whitegrid')
         plt.plot(T, x[:, 0], 'b', linewidth=2)
         plt.plot(T, x[:, 1], 'g', linewidth=2)
         plt.plot(T, x[:, 2], 'r', linewidth=2)
@@ -41,7 +40,6 @@ class Trajectory(object):
         plt.grid(visible=True, which='minor', color='#999999', linestyle=':')
 
         plt.subplot(312)
-        plt.style.use('seaborn-whitegrid')
         plt.plot(T, v[:, 0], ':b', linewidth=2)
         plt.plot(T, v[:, 1], ':g', linewidth=2)
         plt.plot(T, v[:, 2], ':r', linewidth=2)
@@ -89,13 +87,15 @@ class SmoothTraj(Trajectory):
         if t >= self._tf:
             return self._xf, np.zeros(3), np.zeros(3)
         elif t <= 0:
-            warnings.warn("cannot have t < 0")
+            warnings.warn("Time cannot be negative")
             return self._x0, np.zeros(3), np.zeros(3)
         else:
             l = t / self._tf
-            return (np.array([self._t(l)])@self._pos_params)[0],\
-                   (np.array([self._t(l)])@self._vel_params)[0],\
-                   (np.array([self._t(l)])@self._acc_params)[0]
+            print(self._t(l))
+            print(self._pos_params)
+            return (np.array([self._t(l)]) @ self._pos_params)[0],\
+                   (np.array([self._t(l)]) @ self._vel_params)[0],\
+                   (np.array([self._t(l)]) @ self._acc_params)[0]
 
 
 class SmoothTraj5(SmoothTraj):
@@ -109,23 +109,10 @@ class SmoothTraj5(SmoothTraj):
 
     def compute_traj_params(self):
         a = self._xf - self._x0
-        #                  np.array([  c,           t,          t^2,        t^3,  t^4, t^5])
-        self._pos_params = np.array(
-            [self._x0,
-             np.zeros(3, ),
-             np.zeros(3, ), 10 * a, -15 * a, 6 * a])
-        self._vel_params = np.array([
-            np.zeros(3, ), 2 * np.zeros(3, ), 3 * 10 * a, 4 * -15 * a,
-            5 * 6 * a,
-            np.zeros(3)
-        ])
-        self._acc_params = np.array([
-            np.zeros(3, ), 6 * 10 * a, 12 * -15 * a, 20 * 6 * a,
-            np.zeros(3),
-            np.zeros(3)
-        ])
+        self._pos_params = np.array([self._x0, np.zeros(3), np.zeros(3), 10*a, -15*a, 6*a])
+        self._vel_params = np.array([np.zeros(3), 2*np.zeros(3), 3*10*a, 4*(-15)*a, 5*6*a, np.zeros(3)])
+        self._acc_params = np.array([np.zeros(3), 6*10*a, 12*(-15)*a, 20*6*a, np.zeros(3), np.zeros(3)])
         pass
-
 
 class SmoothTraj3(SmoothTraj):
     """
@@ -146,7 +133,6 @@ class SmoothTraj3(SmoothTraj):
         self._acc_params = np.array([6 * a, -12 * a, np.zeros(3), np.zeros(3)])
         pass
 
-
 class SmoothTraj1(SmoothTraj):
     """
     given initial and final position
@@ -163,7 +149,6 @@ class SmoothTraj1(SmoothTraj):
         self._vel_params = np.array([a, np.zeros(3)])
         self._acc_params = np.array([np.zeros(3), np.zeros(3)])
         pass
-
 
 class CircularTraj(Trajectory):
     def __init__(self, r=1, origin=np.zeros(3), w=0.5 * np.pi):
@@ -246,13 +231,15 @@ class CrazyTrajectory(Trajectory):
 
 
 if __name__ == "__main__":
-    traj = SmoothTraj5(-1 + 2 * np.random.rand(3), 10 * np.random.rand(3), 10)
+    traj = Setpoint(np.array([-10,-10,2]))
     traj.plot()
-    traj = SmoothTraj3(-1 + 2 * np.random.rand(3), 10 * np.random.rand(3), 10)
-    traj.plot()
-    traj = SmoothTraj1(-1 + 2 * np.random.rand(3), 10 * np.random.rand(3), 10)
-    traj.plot()
-    traj = CircularTraj()
-    traj.plot()
-    traj = SmoothSineTraj(-1 + 2 * np.random.rand(3), 10 * np.random.rand(3), 5)
-    traj.plot()
+    # traj = SmoothTraj5(-1 + 2 * np.random.rand(3), 10 * np.random.rand(3), 10)
+    # traj.plot()
+    # traj = SmoothTraj3(-1 + 2 * np.random.rand(3), 10 * np.random.rand(3), 10)
+    # traj.plot()
+    # traj = SmoothTraj1(-1 + 2 * np.random.rand(3), 10 * np.random.rand(3), 10)
+    # traj.plot()
+    # traj = CircularTraj()
+    # traj.plot()
+    # traj = SmoothSineTraj(-1 + 2 * np.random.rand(3), 10 * np.random.rand(3), 5)
+    # traj.plot()
