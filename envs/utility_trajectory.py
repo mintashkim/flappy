@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 
 class Trajectory(object):
     def __init__(self):
-        self._tf = 10
+        self._tf = 20
         pass
 
     def compute_traj_params(self):

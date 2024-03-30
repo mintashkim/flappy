@@ -21,6 +21,7 @@ from aero_force import aero
 from action_filter import ActionFilterButter
 from env_randomize import EnvRandomizer
 from utility_functions import *
+import utility_trajectory as ut
 from rotation_transformations import *
 from pid_controller import PID_Controller
 
@@ -33,7 +34,7 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
     
     def __init__(
         self,
-        max_timesteps = 10000,
+        max_timesteps = 20000,
         is_visual     = False,
         is_randomize  = False,
         is_debug      = False,
@@ -101,9 +102,11 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         self.num_episode        = 0
         self.previous_epi_len   = deque(maxlen=10); [self.previous_epi_len.append(0) for _ in range(10)]
         
+        self.ref_traj = ut.Setpoint(np.array([10,0,2]))
+
         # NOTE: Lower & upper bounds do not actually limit the actions output from MLP network, manually clip instead
-        self.pos_lb = np.array([-10,-10,0.5]) # fight space dimensions: xyz(m)
-        self.pos_ub = np.array([10,10,10])
+        self.pos_lb = np.array([-20,-20,0.5]) # fight space dimensions: xyz(m)
+        self.pos_ub = np.array([20,20,10])
         self.speed_bound = 10.0
         
         # MujocoEnv
@@ -148,6 +151,7 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         self._seed()
         self.reset()
         self._init_env()
+
         self.pid_controller = PID_Controller(self)
         self.last_pid_ctrl = np.zeros(self.n_action-2)
 
