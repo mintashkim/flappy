@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 
 class Trajectory(object):
     def __init__(self):
-        self._tf = 20
+        self._tf = 10
         pass
 
     def compute_traj_params(self):
@@ -91,8 +91,8 @@ class SmoothTraj(Trajectory):
             return self._x0, np.zeros(3), np.zeros(3)
         else:
             l = t / self._tf
-            print(self._t(l))
-            print(self._pos_params)
+            # print(self._t(l))
+            # print(self._pos_params)
             return (np.array([self._t(l)]) @ self._pos_params)[0],\
                    (np.array([self._t(l)]) @ self._vel_params)[0],\
                    (np.array([self._t(l)]) @ self._acc_params)[0]
@@ -231,13 +231,15 @@ class CrazyTrajectory(Trajectory):
 
 
 if __name__ == "__main__":
-    traj = Setpoint(np.array([-10,-10,2]))
+    # traj = Setpoint(np.array([-10,-10,2]))
+    # traj.plot()
+    traj = SmoothTraj3(x0=np.array([0,0,2]), xf=np.array([5,0,2]), tf=10)
     traj.plot()
     # traj = SmoothTraj5(-1 + 2 * np.random.rand(3), 10 * np.random.rand(3), 10)
     # traj.plot()
     # traj = SmoothTraj3(-1 + 2 * np.random.rand(3), 10 * np.random.rand(3), 10)
     # traj.plot()
-    # traj = SmoothTraj1(-1 + 2 * np.random.rand(3), 10 * np.random.rand(3), 10)
+    # traj = SmoothTraj1(x0=np.array([0,0,2]), xf=np.array([5,0,2]), tf=10)
     # traj.plot()
     # traj = CircularTraj()
     # traj.plot()
