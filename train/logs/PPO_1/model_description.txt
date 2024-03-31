@@ -1,4 +1,0 @@
-Moving along z-axis
-Timestep 1e-3
-Built-in aerodynamics
-Did not work well
