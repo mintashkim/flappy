@@ -297,8 +297,16 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         if self.render_mode == "human": self.render()
         # 3. Get Observation
         obs = self._get_obs() # o_{t+1}
-        print(obs)
-        if self.is_io_history: obs_curr = obs[(self.data.sensordata.shape[0] + self.action_space.shape[0] + 2) * self.history_len :]
+        # print("Previous observation")
+        # print(obs[0 : (self.data.sensordata.shape[0]+2)*self.history_len].reshape(4,15))
+        # print("Previous action")
+        # print(obs[(self.data.sensordata.shape[0]+2)*self.history_len : (self.data.sensordata.shape[0]+2+self.action_space.shape[0])*self.history_len].reshape(4,8))
+        # print("Current observation")
+        # print(obs[(self.data.sensordata.shape[0] + self.action_space.shape[0] + 2) * self.history_len : (self.data.sensordata.shape[0] + self.action_space.shape[0] + 2) * self.history_len + 15].reshape(1,15))
+        # print("Future trajectory")
+        # print(obs[(self.data.sensordata.shape[0] + self.action_space.shape[0] + 2) * self.history_len + 15 :].reshape(3,6))
+        
+        if self.is_io_history: obs_curr = obs[(self.data.sensordata.shape[0] + self.action_space.shape[0] + 2) * self.history_len : (self.data.sensordata.shape[0] + self.action_space.shape[0] + 2) * self.history_len + 15]
         else: obs_curr = obs
         # 4. Get Reward
         reward, reward_dict = self._get_reward(action_filtered, obs_curr)
@@ -314,14 +322,14 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         # if self.is_plotting_joint and self.timestep == 500: self._plot_joint() # Plot recorded data
         if terminated and self.timestep < (np.average(self.previous_epi_len)//1000+1)*1000:
             reward -= (10 - np.average(self.previous_epi_len)//1000) # Early Termination Penalty
-        if terminated:
-            print("Episode terminated")
-            # print("Last action: {}".format(np.round(self.last_act[2:],2)))
-            if self.is_pid:
-                print("Last PID control: {}".format(np.round(self.last_pid_ctrl,2)))
-                self.pid_controller.reset()
-            # print("Previous obs: {}".format(np.round(self.previous_obs,2)))
-            # print("Previous act: {}".format(np.round(self.previous_act,2)))
+        # if terminated:
+        #     print("Episode terminated")
+        #     print("Last action: {}".format(np.round(self.last_act[2:],2)))
+        #     if self.is_pid:
+        #         print("Last PID control: {}".format(np.round(self.last_pid_ctrl,2)))
+        #         self.pid_controller.reset()
+        #     print("Previous obs: {}".format(np.round(self.previous_obs,2)))
+        #     print("Previous act: {}".format(np.round(self.previous_act,2)))
 
         return obs, reward, terminated, truncated, self.info
     
