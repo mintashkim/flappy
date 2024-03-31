@@ -519,7 +519,8 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
 
     def _truncated(self):
         if self.timestep >= self.max_timesteps:
-            print("Max step reached: Timestep: {timestep}  |  Time: {time}s".format(timestep=self.max_timesteps, time=round(self.timestep*self.dt,2)))
+            pos = np.array(self.data.sensordata[0:3], dtype=float)
+            print("Max step reached: Timestep: {timestep}  |  Position: {pos}  |  Time: {time}s".format(timestep=self.max_timesteps, pos=np.round(pos,2), time=round(self.timestep*self.dt,2)))
             return True
         else:
             return False

@@ -35,18 +35,12 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
     def __init__(
         self,
         max_timesteps = 20000,
-        is_visual     = False,
-        is_randomize  = False,
-        is_debug      = False,
-        is_lpf_action = True,
-        traj_type     = False,
         # xml_file: str = "../assets/Flappy_v8_FixedAxis.xml",
         xml_file: str = "../assets/Flappy_v8_JointInput.xml",
         # xml_file: str = "../assets/Flappy_v8_Base.xml",
         frame_skip: int = 1,
         default_camera_config: Dict[str, Union[float, int]] = DEFAULT_CAMERA_CONFIG,
         reset_noise_scale: float = 0.01,
-        is_transfer = False,
         **kwargs
     ):
         self.model = mj.MjModel.from_xml_path(xml_file)
@@ -58,7 +52,7 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         #################### DYNAMICS ####################
         ##################################################
         self.p = Simulation_Parameter()
-        self.sim = Flappy(p=self.p, render=is_visual)
+        self.sim = Flappy(p=self.p, render=False)
         self.sim_freq: int         = self.sim.freq # NOTE: 2000Hz for hard coding
         # self.dt                    = 1e-3 # NOTE: 1.0 / self.sim_freq = 1/2000s for hard coding
         self.frame_skip = frame_skip
@@ -78,16 +72,19 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         ##################################################
         ################### TRAJECTORY ###################
         ##################################################
-        self.traj_type = traj_type
-        self.ref_traj = ut.SmoothTraj5(x0=np.array([0,0,2]), xf=np.array([5,0,2]), tf=10)
+        self.ref_traj           = ut.SmoothTraj5(x0=np.array([0,0,2]), xf=np.array([5,0,2]), tf=10)
+        self.traj_history_len   = 3
+        self.future_traj        = deque(maxlen=self.traj_history_len) # future_traj = [x_{t+1},v_{t+1}, x_{t+4},v_{t+4}, x_{t+7},v_{t+7}]
+        
         ##################################################
         #################### Booleans ####################
         ##################################################
-        self.is_lpf_action      = is_lpf_action # Low Pass Filter
-        self.is_visual          = is_visual
-        self.is_transfer        = is_transfer
-        self.is_debug           = is_debug
-        self.is_randomize       = is_randomize
+        self.is_traj            = True
+        self.is_lpf_action      = True # Low Pass Filter
+        self.is_visual          = False
+        self.is_transfer        = False
+        self.is_debug           = False
+        self.is_randomize       = False
         self.is_noisy           = False
         self.is_random_dynamics = False # True to randomize dynamics
         self.is_plotting_joint  = False
@@ -188,13 +185,18 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
 
     def _set_observation_space(self):
         if self.is_io_history:
-            obs_shape = (self.data.sensordata.shape[0]+2)*(self.history_len+1) + self.action_space.shape[0]*self.history_len
-            observation_space = Box(low=-np.inf, high=np.inf, shape=(obs_shape,))
-            return observation_space
+            if self.is_traj:
+                # NOTE: obs = [o_t-4:o_t, a_t-4:a_t, o_t, future_traj], shape=(125,)=15x4+8x4+15x1+6*3
+                # o_t = [sensordata, joint_5,6]
+                # future_traj = [x_{t+1},v_{t+1}, x_{t+4},v_{t+4}, x_{t+7},v_{t+7}]
+                obs_shape = (self.data.sensordata.shape[0]+2)*(self.history_len+1) + self.action_space.shape[0]*self.history_len + (3+3)*self.traj_history_len
+            else:
+                # NOTE: obs = [o_t-4:o_t, a_t-4:a_t, o_t], shape=(107,)=15x4+8x4+15x1, o_t = [sensordata, joint_5,6]
+                obs_shape = (self.data.sensordata.shape[0]+2)*(self.history_len+1) + self.action_space.shape[0]*self.history_len
         else:
             obs_shape = self.data.sensordata.shape[0]+2
-            observation_space = Box(low=-np.inf, high=np.inf, shape=(obs_shape,))
-            return observation_space
+        observation_space = Box(low=-np.inf, high=np.inf, shape=(obs_shape,))
+        return observation_space
 
     def _init_env(self):
         print("Environment created")
@@ -202,10 +204,10 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         print("Action Space: {}".format(np.array(self.model.actuator_ctrlrange.T)))
         print("Actual Action Space: {}".format(np.array(self.action_space)))
         print("Observation Space: {}".format(np.array(self.observation_space)))
-        print("Launch control: {}".format(self.is_launch_control))
+        # print("Launch control: {}".format(self.is_launch_control))
         print("Time step(sec): {}".format(self.dt))
-        print("Policy frequency(Hz): {}".format(self.policy_freq))
-        print("Num sims / Env step: {}".format(self.num_sims_per_env_step))
+        # print("Policy frequency(Hz): {}".format(self.policy_freq))
+        # print("Num sims / Env step: {}".format(self.num_sims_per_env_step))
         print("-"*100)
 
     def _init_action_filter(self):
@@ -270,8 +272,13 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
             if self.timestep == 0:
                 [self.previous_obs.append(obs_curr) for _ in range(self.history_len)]
                 [self.previous_act.append(np.zeros(self.n_action)) for _ in range(self.history_len)]
+                if self.is_traj:
+                    for i in range(self.traj_history_len):
+                        desired_pos, desired_vel, desired_acc = self.ref_traj.get(self.time_in_sec+(3*i+1)*self.dt)
+                        self.future_traj.append(np.concatenate([desired_pos, desired_vel]))
             obs_prev = np.concatenate([np.array(self.previous_obs,dtype=object).flatten(), np.array(self.previous_act,dtype=object).flatten()])
-            obs = np.concatenate([obs_prev, obs_curr])
+            future_traj = np.array(self.future_traj,dtype=object).flatten()
+            obs = np.concatenate([obs_prev, obs_curr, future_traj])
         else:
             obs = obs_curr
         return obs
@@ -453,6 +460,8 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         if step:
             self.previous_obs.append(obs_curr)
             self.previous_act.append(action)
+            desired_pos, desired_vel, desired_acc = self.ref_traj.get(self.time_in_sec+(3*2+1)*self.dt)
+            self.future_traj.append(np.concatenate([desired_pos, desired_vel]))
             self.time_in_sec = np.round(self.time_in_sec + self.dt, 3)
             self.timestep += 1
 
@@ -537,7 +546,8 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
 
     def _truncated(self):
         if self.timestep >= self.max_timesteps:
-            print("Max step reached: Timestep: {timestep}  |  Time: {time}s".format(timestep=self.max_timesteps, time=round(self.timestep*self.dt,2)))
+            pos = np.array(self.data.sensordata[0:3], dtype=float)
+            print("Max step reached: Timestep: {timestep}  |  Position: {pos}  |  Time: {time}s".format(timestep=self.max_timesteps, pos=np.round(pos,2), time=round(self.timestep*self.dt,2)))
             return True
         else:
             return False
