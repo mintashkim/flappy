@@ -297,6 +297,8 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         if self.render_mode == "human": self.render()
         # 3. Get Observation
         obs = self._get_obs() # o_{t+1}
+        # PRINT OBS
+        # region
         # print("Previous observation")
         # print(obs[0 : (self.data.sensordata.shape[0]+2)*self.history_len].reshape(4,15))
         # print("Previous action")
@@ -305,7 +307,7 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         # print(obs[(self.data.sensordata.shape[0] + self.action_space.shape[0] + 2) * self.history_len : (self.data.sensordata.shape[0] + self.action_space.shape[0] + 2) * self.history_len + 15].reshape(1,15))
         # print("Future trajectory")
         # print(obs[(self.data.sensordata.shape[0] + self.action_space.shape[0] + 2) * self.history_len + 15 :].reshape(3,6))
-        
+        # endregion
         if self.is_io_history: obs_curr = obs[(self.data.sensordata.shape[0] + self.action_space.shape[0] + 2) * self.history_len : (self.data.sensordata.shape[0] + self.action_space.shape[0] + 2) * self.history_len + 15]
         else: obs_curr = obs
         # 4. Get Reward
