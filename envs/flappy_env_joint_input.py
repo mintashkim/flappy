@@ -480,7 +480,7 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
             self.future_traj.append(np.concatenate([desired_pos, desired_vel]))
 
     def _get_reward(self, action, obs_curr):
-        names = ['position_error', 'velocity_error', 'angular_velocity', 'orientation_error', 'input', 'delta_acs']
+        names = ['pos_rew', 'vel_rew', 'ang_vel_rew', 'ori_rew', 'input_rew', 'delta_acs_rew']
 
         w_position         = np.average(self.previous_epi_len)//1000 + 1 # Focus on position more as it can fly better
         w_velocity         = np.average(self.previous_epi_len)//2000 + 1
@@ -525,7 +525,14 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         rewards = np.exp(-np.array([scale_pos, scale_ori, scale_vel, scale_ang_vel, scale_input, scale_delta_act, scale_pid]
                          * np.array([pos_err, ori_err, vel_err, ang_vel_err, input_err, delta_act_err, pid_err])))
         total_reward = np.sum(weights * rewards)
-        reward_dict = dict(zip(names, weights * rewards))
+        # NOTE: Position-based discontinuous bonus (Linear trajectory only)
+        # if |x - 1| < 0.1: bonus = 0.1 * (1 - exp(-1)) = 0.063 / 0.086 / 0.095 / 0.098 / 0.099
+        # bonus \in [0,0.1) and concave
+        bonus_point = np.array([np.array([i,0,2]) for i in range(6)])
+        bonus = 0.1*(1-np.exp(-int(current_pos[0])))
+        if np.linalg.norm(current_pos - bonus_point[int(current_pos[0])]) < 0.1: total_reward += bonus
+        
+        reward_dict = dict(zip(names, weights * rewards)) 
 
         return total_reward, reward_dict
 
