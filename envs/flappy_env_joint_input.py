@@ -530,7 +530,9 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         # bonus \in [0,0.1) and concave
         bonus_point = np.array([np.array([i,0,2]) for i in range(6)])
         bonus = 0.1*(1-np.exp(-int(current_pos[0])))
-        if np.linalg.norm(current_pos - bonus_point[int(current_pos[0])]) < 0.1: total_reward += bonus
+        if np.linalg.norm(current_pos - bonus_point[int(current_pos[0])]) < 0.1: 
+            total_reward += bonus
+            if bonus > 0: print("Bonus earned")
         
         reward_dict = dict(zip(names, weights * rewards)) 
 
