@@ -27,20 +27,21 @@ from pid_controller import PID_Controller
 
 
 DEFAULT_CAMERA_CONFIG = {"trackbodyid": 0, "distance": 10.0}
-TRAJECTORY_TYPES = {"linear": 0, "circular": 1, "setpoint": 2}
+TRAJECTORY_TYPES = {"setpoint": 0, "linear": 1, "circular": 2}
 
 class FlappyEnv(MujocoEnv, utils.EzPickle):
     metadata = {"render_modes": ["human", "rgb_array", "depth_array"]}
     
     def __init__(
         self,
-        max_timesteps = 20000,
+        max_timesteps = 30000,
         # xml_file: str = "../assets/Flappy_v8_FixedAxis.xml",
         xml_file: str = "../assets/Flappy_v8_JointInput.xml",
         # xml_file: str = "../assets/Flappy_v8_Base.xml",
         frame_skip: int = 1,
         default_camera_config: Dict[str, Union[float, int]] = DEFAULT_CAMERA_CONFIG,
         reset_noise_scale: float = 0.01,
+        trajectory_type = "setpoint",
         **kwargs
     ):
         self.model = mj.MjModel.from_xml_path(xml_file)
@@ -72,10 +73,17 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         ##################################################
         ################### TRAJECTORY ###################
         ##################################################
-        self.ref_traj           = ut.SmoothTraj5(x0=np.array([0,0,2]), xf=np.array([5,0,2]), tf=10)
-        self.traj_history_len   = 3
-        self.future_traj        = deque(maxlen=self.traj_history_len) # future_traj = [x_{t+1},v_{t+1}, x_{t+4},v_{t+4}, x_{t+7},v_{t+7}]
-        
+        self.trajectory_type = trajectory_type
+        if self.trajectory_type == "setpoint":
+            self.ref_traj           = ut.Setpoint(np.array([0,0,2]))
+            self.traj_history_len   = 1
+            self.future_traj        = deque(maxlen=self.traj_history_len) # future_traj = [x_{t+1},v_{t+1}, x_{t+4},v_{t+4}, x_{t+7},v_{t+7}]
+            self.bonus_point        = np.array([np.array([i,0,2]) for i in range(6)])
+        if self.trajectory_type == "linear":
+            self.ref_traj           = ut.SmoothTraj5(x0=np.array([0,0,2]), xf=np.array([5,0,2]), tf=10)
+            self.traj_history_len   = 3
+            self.future_traj        = deque(maxlen=self.traj_history_len) # future_traj = [x_{t+1},v_{t+1}, x_{t+4},v_{t+4}, x_{t+7},v_{t+7}]
+            self.bonus_point        = np.array([np.array([i,0,2]) for i in range(6)])
         ##################################################
         #################### Booleans ####################
         ##################################################
@@ -510,6 +518,7 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         desired_ang_vel = np.array([0.0,0.0,0.0]) # \omega_x \omega_y \omega_z
         
         current_pos     = obs_curr[0:3]
+        current_pos     = np.array([2,0,0])
         current_ori     = obs_curr[3:7]
         current_vel     = obs_curr[7:10]
         current_ang_vel = obs_curr[10:13]
@@ -530,11 +539,14 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         # if |x - 1| < 0.1: bonus = 0.1 * (1 - exp(-1)) = 0.063 / 0.086 / 0.095 / 0.098 / 0.099
         # bonus \in [0,0.1) and concave
         if self.is_bonus:
-            bonus_point = np.array([np.array([i,0,2]) for i in range(6)])
-            bonus = 0.1*(1-np.exp(-np.min([int(current_pos[0]), 5])))
-            if np.linalg.norm(current_pos - bonus_point[np.min([int(current_pos[0]), 5])]) < 0.1: 
+            bonus = 0.1*(1-np.exp(-np.min([np.abs(int(current_pos[0])), 5])))
+            if np.linalg.norm(current_pos - self.bonus_point[np.min([np.abs(int(current_pos[0])), 5])]) < 0.1: 
                 total_reward += bonus
-                if bonus > 0: print("Bonus earned")
+                if bonus > 0:
+                    print("Bonus earned  |  Bonus Point: {bp}  |  Postion: {pos}  |  Bonus: {bonus}".format(
+                          bp=self.bonus_point[np.min([np.abs(int(current_pos[0])), 5])],
+                          pos=np.round(current_pos, 2),
+                          bonus=np.round(bonus, 2)))
         
         reward_dict = dict(zip(names, weights * rewards)) 
 
@@ -566,16 +578,14 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
             self.previous_epi_len.append(self.timestep)
             print("Episode {epi}  |  Out of speed bounds: {vel}  |  Timestep: {timestep}  |  Time: {time}s".format(epi=self.num_episode, vel=np.round(vel,2), timestep=self.timestep, time=round(self.timestep*self.dt,2)))
             return True
-        else:
-            return False
-
-    def _truncated(self):
-        if self.timestep >= self.max_timesteps:
-            pos = np.array(self.data.sensordata[0:3], dtype=float)
+        elif self.timestep >= self.max_timesteps:
             print("Max step reached: Timestep: {timestep}  |  Position: {pos}  |  Time: {time}s".format(timestep=self.max_timesteps, pos=np.round(pos,2), time=round(self.timestep*self.dt,2)))
             return True
         else:
             return False
+
+    def _truncated(self):
+        return False
 
     def get_bodyIDs(self, body_list):
         bodyID_dic = {}
@@ -603,3 +613,4 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
     def close(self):
         if self.mujoco_renderer is not None:
             self.mujoco_renderer.close()
+
