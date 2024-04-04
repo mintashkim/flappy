@@ -11,7 +11,7 @@ from envs.flappy_env_joint_input import FlappyEnv
 
 
 log_path = os.path.join('logs')
-save_path = os.path.join('saved_models/saved_models_PPO_23')
+save_path = os.path.join('saved_models/saved_models_PPO_server_2')
 
 def create_env(rank: int, seed: int = 0):
     def _init():

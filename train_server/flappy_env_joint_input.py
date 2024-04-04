@@ -1,7 +1,7 @@
 # Helpers
 import os, sys
-sys.path.append('/Users/mintaekim/Desktop/HRL/Flappy/Integrated/Flappy_Integrated/flappy_v2')
-sys.path.append('/Users/mintaekim/Desktop/HRL/Flappy/Integrated/Flappy_Integrated/flappy_v2/envs')
+sys.path.append('/home/mkim/flappy/flappy_v2')
+sys.path.append('/home/mkim/flappy/flappy_v2/envs')
 import numpy as np
 from typing import Dict, Union
 from collections import deque
