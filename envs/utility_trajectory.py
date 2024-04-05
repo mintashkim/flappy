@@ -233,7 +233,7 @@ class CrazyTrajectory(Trajectory):
 # if __name__ == "__main__":
     # traj = Setpoint(np.array([-10,-10,2]))
     # traj.plot()
-    # traj = SmoothTraj3(x0=np.array([0,0,2]), xf=np.array([5,0,2]), tf=10)
+    # traj = SmoothTraj3(x0=np.array([0,0,2]), xf=np.array([3,0,2]), tf=10)
     # print(np.concatenate([traj.get(5)[0],traj.get(5)[1]]))
     # traj.plot()
     # traj = SmoothTraj5(-1 + 2 * np.random.rand(3), 10 * np.random.rand(3), 10)
