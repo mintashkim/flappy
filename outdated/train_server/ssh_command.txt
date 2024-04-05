@@ -1,4 +1,0 @@
-Upload
-
-scp -P 5555 /Users/mintaekim/Desktop/HRL/Flappy/Integrated/Flappy_Integrated/flappy_v2/train_server/run_joint_input.py mkim@hybridrobotics.hopto.org:/home/mkim/flappy/flappy_v2/train
-scp -P 5555 -r /Users/mintaekim/Desktop/HRL/Flappy/Integrated/Flappy_Integrated/flappy_v2/train_server mkim@hybridrobotics.hopto.org:/home/mkim/flappy/flappy_v2
