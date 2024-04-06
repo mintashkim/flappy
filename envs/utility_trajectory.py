@@ -86,7 +86,7 @@ class SmoothTraj(Trajectory):
     def get(self, t):
         if t >= self._tf:
             return self._xf, np.zeros(3), np.zeros(3)
-        elif t <= 0:
+        elif t < 0:
             warnings.warn("Time cannot be negative")
             return self._x0, np.zeros(3), np.zeros(3)
         else:

@@ -44,13 +44,12 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         frame_skip: int = 1,
         default_camera_config: Dict[str, Union[float, int]] = DEFAULT_CAMERA_CONFIG,
         reset_noise_scale: float = 0.01,
-        trajectory_type: str = "linear",
-        env_num: int = 0,
+        trajectory_type = "linear",
         **kwargs
     ):
         self.model = mj.MjModel.from_xml_path(xml_file)
         self.data = mj.MjData(self.model)
-        self.env_num = env_num
+        
         # NOTE: Parameters for Hard-Coded Version
         # region
         ##################################################
@@ -65,13 +64,13 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         self.num_sims_per_env_step = int(self.sim_freq // self.policy_freq) # 2000//30 = 66
         self.secs_per_env_step     = self.num_sims_per_env_step / self.sim_freq # 66/2000 = 0.033s
         self.policy_freq: int      = int(1.0/self.secs_per_env_step) # 1000/33 = 30Hz
-        self.num_step_per_sec: int = int(1.0/self.dt) # 1000
+        self.num_step_per_sec      = int(1.0/self.dt) # 1000
         # self.xa = np.zeros(3*self.p.n_Wagner)
         # endregion
         ##################################################
         ###################### TIME ######################
         ##################################################
-        self.max_timesteps: int = max_timesteps
+        self.max_timesteps      = max_timesteps
         self.timestep: int      = 0
         self.time_in_sec: float = 0.0 # Time
         ##################################################
@@ -174,8 +173,9 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         ##################################################
         self._init_action_filter()
         # self._init_env_randomizer() # NOTE: Take out dynamics randomization first 
-        self._init_env()
+        self._seed()
         self.reset()
+        self._init_env()
         ##################################################
         ################## PID CONTROL ###################
         ##################################################
@@ -212,7 +212,7 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         return observation_space
 
     def _init_env(self):
-        print("Environment {} created".format(self.env_num))
+        print("Environment created")
         print("Sample action: {}".format(self.action_space.sample()))
         print("Action Space: {}".format(np.array(self.model.actuator_ctrlrange.T)))
         print("Actual Action Space: {}".format(np.array(self.action_space)))
@@ -232,9 +232,13 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
             num_joints    = self.n_action,
         )
 
+    def _seed(self, seed=None):
+        self.np_random, _seeds = seeding.np_random(seed)
+        return [seed]
+
     def reset(self, seed=None, randomize=None):
-        super().reset(seed=self.env_num)
-        if randomize is None: randomize = self.is_randomize
+        if randomize is None:
+            randomize = self.is_randomize
         self._reset_env(randomize)
         self.action_filter.reset()
         # self.env_randomizer.randomize_dynamics()
@@ -541,20 +545,18 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         # bonus \in [0,0.1) and concave
         if self.is_bonus and self.trajectory_type == "linear":
             goal_pos_x = int(self.goal_pos[0])
-            bonus = 0.1*(1-np.exp(-np.min([np.abs(round(current_pos[0])), goal_pos_x])))
             if np.linalg.norm(current_pos - self.bonus_point[np.min([np.abs(round(current_pos[0])), goal_pos_x])]) < np.exp(-np.average(self.previous_epi_len)/10000):
+                bonus = 0.1*(1-np.exp(-np.min([np.abs(round(current_pos[0])), goal_pos_x])))
                 total_reward += bonus
                 if (not self.is_previous_bonus) and bonus > 0:
-                    print("Env {env_num}  |  Bonus earned  |  Bonus Point: {bp}  |  Postion: {pos}  |  Bonus: {bonus}".format(
-                          env_num=self.env_num,
+                    print("Bonus earned  |  Bonus Point: {bp}  |  Postion: {pos}  |  Bonus: {bonus}".format(
                           bp=self.bonus_point[np.min([np.abs(round(current_pos[0])), goal_pos_x])],
                           pos=np.round(np.array(current_pos, dtype=float), 2),
                           bonus=np.round(bonus, 3)))
                 self.is_previous_bonus = True
             else:
-                if self.is_previous_bonus and bonus > 0:
-                    print("Env {env_num}  |  Bonus terminated  |  Postion: {pos}".format(
-                          env_num=self.env_num,
+                if self.is_previous_bonus:
+                    print("Bonus terminated  |  Postion: {pos}".format(
                           pos=np.round(np.array(current_pos, dtype=float), 2)))
                 self.is_previous_bonus = False
         
@@ -579,29 +581,15 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
            and (pos >= self.pos_lb).all()):
             self.num_episode += 1
             self.previous_epi_len.append(self.timestep)
-            print("Env {env_num}  |  Episode {epi}  |  Out of position bounds: {pos}  |  Timestep: {timestep}  |  Time: {time}s".format(
-                  env_num=self.env_num,
-                  epi=self.num_episode,
-                  pos=np.round(pos,2),
-                  timestep=self.timestep,
-                  time=round(self.timestep*self.dt,2)))
+            print("Episode {epi}  |  Out of position bounds: {pos}  |  Timestep: {timestep}  |  Time: {time}s".format(epi=self.num_episode, pos=np.round(pos,2), timestep=self.timestep, time=round(self.timestep*self.dt,2)))
             return True
         elif not(np.linalg.norm(vel) <= self.speed_bound):
             self.num_episode += 1
             self.previous_epi_len.append(self.timestep)
-            print("Env {env_num}  |  Episode {epi}  |  Out of speed bounds: {vel}  |  Timestep: {timestep}  |  Time: {time}s".format(
-                  env_num=self.env_num,
-                  epi=self.num_episode,
-                  vel=np.round(vel,2),
-                  timestep=self.timestep,
-                  time=round(self.timestep*self.dt,2)))
+            print("Episode {epi}  |  Out of speed bounds: {vel}  |  Timestep: {timestep}  |  Time: {time}s".format(epi=self.num_episode, vel=np.round(vel,2), timestep=self.timestep, time=round(self.timestep*self.dt,2)))
             return True
         elif self.timestep >= self.max_timesteps:
-            print("Env {env_num}  |  Max step reached: Timestep: {timestep}  |  Position: {pos}  |  Time: {time}s".format(
-                  env_num=self.env_num,
-                  timestep=self.max_timesteps,
-                  pos=np.round(pos,2),
-                  time=round(self.timestep*self.dt,2)))
+            print("Max step reached: Timestep: {timestep}  |  Position: {pos}  |  Time: {time}s".format(timestep=self.max_timesteps, pos=np.round(pos,2), time=round(self.timestep*self.dt,2)))
             return True
         else:
             return False
