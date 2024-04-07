@@ -18,7 +18,7 @@ def parse_arguments():
     
     # Execution parameters
     parser.add_argument('--id', type=str, default='untitled', help='Provide experiment name and ID.')
-    parser.add_argument('--num_steps', type=int, default=1e+8, help='Provide number of steps.')
+    parser.add_argument('--num_steps', type=int, default=1e+9, help='Provide number of steps.')
     # parser.add_argument('--checkpoint', type=str, default=None, help='Loading pretrained model. Provide model path.')
     parser.add_argument('--device', type=str, default='mps', help='Provide device info.')
     parser.add_argument('--num_envs', type=int, default=8, help='Provide number of parallel environments.')
@@ -49,16 +49,15 @@ def main():
     render_mode = 'human' if args_dict['visualize'] else None
     
     # Parallel environment
-    def create_env(rank: int, seed: int = 0):
+    def create_env(seed=0):
         def _init():
-            env = FlappyEnv(render_mode=render_mode, trajectory_type=traj_type)
-            env.reset(seed=seed+rank)
+            env = FlappyEnv(render_mode=render_mode, trajectory_type=traj_type, env_num=seed)
             return env
         set_random_seed(seed)
         return _init
     
     num_cpu = args_dict['num_envs']
-    env = VecMonitor(DummyVecEnv([create_env(i) for i in range(num_cpu)]))
+    env = VecMonitor(DummyVecEnv([create_env(seed=i) for i in range(num_cpu)]))
 
     # Callbacks
     stop_callback = StopTrainingOnRewardThreshold(reward_threshold=20000, verbose=1)

@@ -242,6 +242,7 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         self._update_data(step=False, obs_curr=None, action=None)
         obs = self._get_obs()
         info = self._get_reset_info
+        self.is_previous_bonus = False
         return obs, info
     
     def _reset_env(self, randomize=False):
@@ -551,11 +552,13 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
                           pos=np.round(np.array(current_pos, dtype=float), 2),
                           bonus=np.round(bonus, 3)))
                 self.is_previous_bonus = True
-            else:
+            elif:
                 if self.is_previous_bonus and bonus > 0:
                     print("Env {env_num}  |  Bonus terminated  |  Postion: {pos}".format(
                           env_num=self.env_num,
                           pos=np.round(np.array(current_pos, dtype=float), 2)))
+                self.is_previous_bonus = False
+            else:
                 self.is_previous_bonus = False
         
         return total_reward, reward_dict
