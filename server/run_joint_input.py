@@ -69,12 +69,12 @@ def main():
 
     # Networks
     # NOTE: if is_history: use 128 or more
-    # net_arch = {'pi': [128,128,128],
-    #             'vf': [128,128,128]}
+    net_arch = {'pi': [128,128,128],
+                'vf': [128,128,128]}
     # net_arch = {'pi': [256,128,128,64],
     #             'vf': [256,128,128,64]}
-    net_arch = {'pi': [64,64,64],
-                'vf': [64,64,64]}
+    # net_arch = {'pi': [64,64,64],
+    #             'vf': [64,64,64]}
 
     # PPO Modeling
     def linear_schedule(initial_value):

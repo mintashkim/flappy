@@ -542,20 +542,25 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         if self.is_bonus and self.trajectory_type == "linear":
             goal_pos_x = int(self.goal_pos[0])
             bonus = 0.1*(1-np.exp(-np.min([np.abs(round(current_pos[0])), goal_pos_x])))
+            # In the bonus region
             if np.linalg.norm(current_pos - self.bonus_point[np.min([np.abs(round(current_pos[0])), goal_pos_x])]) < np.exp(-np.average(self.previous_epi_len)/10000):
                 total_reward += bonus
+                # Print only when it just entered the bonus region
                 if (not self.is_previous_bonus) and bonus > 0:
-                    print("Env {env_num}  |  Bonus earned  |  Bonus Point: {bp}  |  Postion: {pos}  |  Bonus: {bonus}".format(
+                    print("Env {env_num}  |  Bonus started  |  Bonus Point: {bp}  |  Postion: {pos}  |  Bonus: {bonus}".format(
                           env_num=self.env_num,
                           bp=self.bonus_point[np.min([np.abs(round(current_pos[0])), goal_pos_x])],
                           pos=np.round(np.array(current_pos, dtype=float), 2),
                           bonus=np.round(bonus, 3)))
-                self.is_previous_bonus = True
+                    self.is_previous_bonus = True
+            # Out of the bonus region
+            # Print only when it just came out of the bonus region
+            elif self.is_previous_bonus:
+                print("Env {env_num}  |  Bonus terminated  |  Postion: {pos}".format(
+                        env_num=self.env_num,
+                        pos=np.round(np.array(current_pos, dtype=float), 2)))
+                self.is_previous_bonus = False
             else:
-                if self.is_previous_bonus and bonus > 0:
-                    print("Env {env_num}  |  Bonus terminated  |  Postion: {pos}".format(
-                          env_num=self.env_num,
-                          pos=np.round(np.array(current_pos, dtype=float), 2)))
                 self.is_previous_bonus = False
         
         return total_reward, reward_dict

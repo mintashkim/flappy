@@ -536,9 +536,7 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         reward_dict = dict(zip(names, weights * rewards)) 
         total_reward = np.sum(weights * rewards)
 
-        # NOTE: Position-based discontinuous bonus (Linear trajectory only)
-        # if |x - 1| < 0.1: bonus = 0.1 * (1 - exp(-1)) = 0.063 / 0.086 / 0.095 / 0.098 / 0.099
-        # bonus \in [0,0.1) and concave
+        # NOTE: Position-based discontinuous bonus (For linear trajectory only)
         if self.is_bonus and self.trajectory_type == "linear":
             goal_pos_x = int(self.goal_pos[0])
             bonus = 0.1*(1-np.exp(-np.min([np.abs(round(current_pos[0])), goal_pos_x])))
@@ -602,8 +600,11 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
                   time=round(self.timestep*self.dt,2)))
             return True
         elif self.timestep >= self.max_timesteps:
-            print("Env {env_num}  |  Max step reached: Timestep: {timestep}  |  Position: {pos}  |  Time: {time}s".format(
+            self.num_episode += 1
+            self.previous_epi_len.append(self.timestep)
+            print("Env {env_num}  |  Episode {epi}  |  Max step reached: Timestep: {timestep}  |  Position: {pos}  |  Time: {time}s".format(
                   env_num=self.env_num,
+                  epi=self.num_episode,
                   timestep=self.max_timesteps,
                   pos=np.round(pos,2),
                   time=round(self.timestep*self.dt,2)))
