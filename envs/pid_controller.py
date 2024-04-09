@@ -80,7 +80,7 @@ class PID_Controller:
         Kd_th = 3
 
         dt_pos = 1/100
-        dt_att = 1/100
+        dt_att = 1/500
 
         # obs = self.env.previous_obs[-1] # (13,)
         pos = obs[0:3]  # should be same as pos

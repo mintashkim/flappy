@@ -1,20 +1,32 @@
 import numpy as np
-from scipy.optimize import fsolve
-from utility_functions import *
-from utility_functions import *
-from func_create_wing_segment import *
+from scipy.optimize import fsolve, root, broyden1, linearmixing
+from .rotation_matrix import *
+from .func_create_wing_segmentV2 import *
 
-def func_initial_joint_angles(theta_1, wing_conformation):
+
+def func_joint_angles(theta_1, wing_conformation):
 
     x0 = np.zeros((7, 1)) # Joints: [1, 2, 3, 5, 6, 8, 9]
     x0[0] = theta_1
 
-    x0[[1,3]] = fsolve(solve_pos4, [0, 0], args=(theta_1, wing_conformation.flatten()), xtol=1e-8).reshape(2,1)
-    x0[[2,5]] = fsolve(solve_pos7, [0, 0], args=(x0[[0,1]], wing_conformation.flatten()), xtol=1e-8).reshape(2,1)
-    x0[[4,6]] = fsolve(solve_pos10, [0, 0], args=(x0[[3,5]], wing_conformation.flatten()), xtol=1e-8).reshape(2,1)
-    x0[4] = 0.2806
+    x0[[1, 3]] = fsolve(solve_pos4, [0.5, 0], args=(theta_1, wing_conformation.flatten())).reshape(2, 1)
+    x0 = wrap_angle(x0)
+    x0[[2,5]] = fsolve(solve_pos7, [0.9, 0.9], args=(x0[[0,1]], wing_conformation.flatten())).reshape(2,1)
+    x0 = wrap_angle(x0)
+    # if theta_1 < np.deg2rad(-30):
+    #     x0[[4, 6]] = fsolve(solve_pos10, [-0.629, -2.06], args=(x0[[3,5]], wing_conformation.flatten())).reshape(2,1)
+    # elif theta_1 < np.deg2rad(50):
+    #     x0[[4, 6]] = fsolve(solve_pos10, [0.5, -2.1], args=(x0[[3, 5]], wing_conformation.flatten())).reshape(2, 1)
+    # else:
+    #     x0[[4, 6]] = fsolve(solve_pos10, [-0.8, -2.3], args=(x0[[3, 5]], wing_conformation.flatten())).reshape(2, 1)
+    if theta_1 < np.deg2rad(-50):
+        x0[[4, 6]] = fsolve(solve_pos10, [-0.629, -2.06], args=(x0[[3,5]], wing_conformation.flatten())).reshape(2,1)
+    elif theta_1 < np.deg2rad(50):
+        x0[[4, 6]] = fsolve(solve_pos10, [0.3, -2.12], args=(x0[[3, 5]], wing_conformation.flatten())).reshape(2, 1)
+    else:
+        x0[[4, 6]] = fsolve(solve_pos10, [-0.8, -2.3], args=(x0[[3, 5]], wing_conformation.flatten())).reshape(2, 1)
 
-    return x0
+    return x0 # wrap_angle(x0)
 
 def solve_pos4(x_solve, theta_1, wing_conformation):
     # theta_1, wing_conformation = arguments[0], arguments[1]
@@ -91,30 +103,6 @@ def solve_pos10(x_solve, x_in, wing_conformation):
 
     return f
 
-def func_joint_angles(theta_1, wing_conformation):
-
-    x0 = np.zeros((7, 1)) # Joints: [1, 2, 3, 5, 6, 8, 9]
-    x0[0] = theta_1
-
-    x0[[1, 3]] = fsolve(solve_pos4, [0.5, 0], args=(theta_1, wing_conformation.flatten())).reshape(2, 1)
-    x0 = wrap_angle(x0)
-    x0[[2,5]] = fsolve(solve_pos7, [0.9, 0.9], args=(x0[[0,1]], wing_conformation.flatten())).reshape(2,1)
-    x0 = wrap_angle(x0)
-    # if theta_1 < np.deg2rad(-30):
-    #     x0[[4, 6]] = fsolve(solve_pos10, [-0.629, -2.06], args=(x0[[3,5]], wing_conformation.flatten())).reshape(2,1)
-    # elif theta_1 < np.deg2rad(50):
-    #     x0[[4, 6]] = fsolve(solve_pos10, [0.5, -2.1], args=(x0[[3, 5]], wing_conformation.flatten())).reshape(2, 1)
-    # else:
-    #     x0[[4, 6]] = fsolve(solve_pos10, [-0.8, -2.3], args=(x0[[3, 5]], wing_conformation.flatten())).reshape(2, 1)
-    if theta_1 < np.deg2rad(-50):
-        x0[[4, 6]] = fsolve(solve_pos10, [-0.629, -2.06], args=(x0[[3,5]], wing_conformation.flatten())).reshape(2,1)
-    elif theta_1 < np.deg2rad(50):
-        x0[[4, 6]] = fsolve(solve_pos10, [0.3, -2.12], args=(x0[[3, 5]], wing_conformation.flatten())).reshape(2, 1)
-    else:
-        x0[[4, 6]] = fsolve(solve_pos10, [-0.8, -2.3], args=(x0[[3, 5]], wing_conformation.flatten())).reshape(2, 1)
-
-    return x0 # wrap_angle(x0)
-
 def wrap_angle(angle):
     return np.arctan2(np.sin(angle), np.cos(angle))
 
@@ -155,40 +143,3 @@ def FDC_theta(theta_1, L3b=6.71/1000, L5a=11.18/1000, L5b=10/1000):
 
     x0 = func_joint_angles(theta_1, wing_conformation.flatten())
     return x0 #x0[3:5,:]  # theta 5, theta 6
-
-# if __name__ == '__main__':
-#     # Linkage length parameters (meter)
-#     L1  = 7.5/1000
-#     L2a = 35/1000
-#     L2b = 5/1000 * np.cos(np.deg2rad(35))
-#     L2c = 5/1000 * np.sin(np.deg2rad(35))
-#     L3a = 50/1000
-#     L3b = 6.71/1000
-#     L3c = 6/1000
-#     L4  = 36/1000
-#     L5a = 11.18/1000
-#     L5b = 10/1000
-#     L5c = 78.78/1000
-#     L5d = -3.89/1000
-#     L6  = 36/1000
-#     L7a = 90/1000
-#     L7b = 35/1000
-#     L7c = 15/1000
-
-#     # Stationary joint positions (x,y) (meter)
-#     P1  = (np.array([-10, -9.8]) / 1000).reshape(2,1)
-#     P5  = (22 * np.array([np.cos(np.deg2rad(20)), np.sin(np.deg2rad(20))]) / 1000).reshape(2,1)
-#     P8  = (22 * np.array([np.sin(np.deg2rad(25)), np.cos(np.deg2rad(25))]) / 1000).reshape(2,1)
-
-#     # Wing origin offset about x-axis relative to the body COM
-#     offset_x  = np.array([-42/1000]).reshape(1,1) # wing com offset in x-axis (meter) -15 old value
-
-#     # Other parameters
-#     alpha_3 = np.deg2rad(-15) # humerus link bend angle
-
-#     # For symbolic generated function
-#     L = np.array([L1, L2a, L2b, L2c, L3a, L3b, L3c, alpha_3, L4, 
-#                 L5a, L5b, L5c, L5d, L6, L7a, L7b, L7c]).reshape(17,1)
-#     wing_conformation = np.concatenate([L, P1, P5, P8, offset_x], axis=0)
-
-#     print(func_initial_joint_angles(np.deg2rad(-90), wing_conformation.flatten()))
