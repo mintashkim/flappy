@@ -9,7 +9,7 @@ from stable_baselines3.common.vec_env import DummyVecEnv, VecMonitor
 from stable_baselines3.common.evaluation import evaluate_policy
 from stable_baselines3.common.callbacks import EvalCallback, StopTrainingOnRewardThreshold
 from stable_baselines3.common.utils import set_random_seed
-from envs.flappy_env_joint_input_pid import FlappyEnv
+from envs.flappy_env_fdc import FlappyEnv
 from PIL import Image
 import argparse
 
