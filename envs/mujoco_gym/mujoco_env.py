@@ -1,9 +1,9 @@
 import os, sys
+from os import path
 current_dir = os.path.dirname(__file__)
 parent_dir = os.path.abspath(os.path.join(current_dir, '..'))
 sys.path.append(os.path.join(parent_dir))
-sys.path.append(os.path.join(parent_dir, 'envs'))
-sys.path.append(os.path.join(parent_dir, 'envs', 'mujoco_gym'))
+sys.path.append(os.path.join(parent_dir, 'mujoco_gym'))
 
 from typing import Any, Dict, Optional, Tuple, Union
 
