@@ -82,8 +82,8 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
             self.traj_history_len   = 1
             self.future_traj        = deque(maxlen=self.traj_history_len) # future_traj = [x_{t+1},v_{t+1}, x_{t+4},v_{t+4}, x_{t+7},v_{t+7}]
         if self.trajectory_type == "linear":
-            self.goal_pos           = np.array([3,0,2])
-            self.ref_traj           = ut.SmoothTraj3(x0=np.array([0,0,2]), xf=self.goal_pos, tf=10)
+            self.goal_pos           = np.array([10,0,2])
+            self.ref_traj           = ut.SmoothTraj3(x0=np.array([0,0,2]), xf=self.goal_pos, tf=100)
             self.traj_history_len   = 3
             self.future_traj        = deque(maxlen=self.traj_history_len) # future_traj = [x_{t+1},v_{t+1}, x_{t+4},v_{t+4}, x_{t+7},v_{t+7}]
             self.bonus_point        = np.array([np.array([i,0,2]) for i in range(int(self.goal_pos[0]+1))])
@@ -91,7 +91,7 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         #################### BOOLEANS ####################
         ##################################################
         self.is_traj            = True
-        self.is_lpf_action      = True # Low Pass Filter
+        self.is_lpf_action      = False # Low Pass Filter
         self.is_visual          = False
         self.is_transfer        = False
         self.is_debug           = False
@@ -112,7 +112,7 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         ##################################################
         self.env_num            = env_num
         self.n_state            = 84 # NOTE: change to the number of states *we can measure*
-        self.n_action           = 12 # NOTE: change to the number of action
+        self.n_action           = 13 # NOTE: change to the number of action
         self.history_len_short  = 4 # NOTE: [o_{t-4}:o_{t}, a_{t-4}:a_{t}], o_{t} = [sensordata, θ_5, θ_6]
         self.history_len_long   = 10
         self.history_len        = self.history_len_short
@@ -191,7 +191,8 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         return self.model.opt.timestep * self.frame_skip
     
     def _set_action_space(self):
-        low, high = np.zeros(12), np.ones(12)
+        low = np.concatenate([np.zeros(12),[5]])
+        high = np.concatenate([np.ones(12),[8]])
         if self.is_action_bound: self.action_space = Box(low=0.2*np.ones(12), high=0.8*np.ones(12))
         else: self.action_space = Box(low=low, high=high)
         return self.action_space
@@ -404,7 +405,8 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
             # Integrate Aero States
             self.xa = self.xa + fa * self.dt
 
-        flap_freq = self.flapping_freq # self.flapping_freq*(np.sin(np.pi*2*self.timestep)+1)  # <===== (some time-varying input just for checking; need to be replaced to some other value)
+        flap_freq = ctrl[12]
+        self.flapping_freq = flap_freq # self.flapping_freq*(np.sin(np.pi*2*self.timestep)+1)  # <===== (some time-varying input just for checking; need to be replaced to some other value)
         # Integrate theta 1 (driving gear)
         d_theta1_ref = 2*np.pi*flap_freq
         kd_theta1 = 10
@@ -496,22 +498,25 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         desired_pos, desired_vel, desired_acc = self.ref_traj.get(self.time_in_sec)
 
         # desired_pos     = np.array([0.0,0.0,2.0]) # x y z 
-        desired_ori     = np.array([1.0,0.0,0.0,0.0]) # roll, pitch, yaw
+        # desired_ori     = np.array([1.0,0.0,0.0,0.0]) # roll, pitch, yaw
+        desired_att     = quat2euler_raw(np.array([1.0,0.0,0.0,0.0])) # roll, pitch, yaw
         # desired_vel     = np.array([0.0,0.0,0.0]) # vx vy vz
         desired_ang_vel = np.array([0.0,0.0,0.0]) # \omega_x \omega_y \omega_z
         
         current_pos     = obs_curr[0:3]
-        current_ori     = obs_curr[3:7]
+        # current_ori     = obs_curr[3:7]
+        current_att     = quat2euler_raw(obs_curr[3:7])
         current_vel     = obs_curr[7:10]
         current_ang_vel = obs_curr[10:13]
 
         pos_err       = np.linalg.norm(current_pos - desired_pos)
         # if self.is_transfer: pos_err += (np.linalg.norm(current_pos[0:2] - desired_pos[0:2]) + np.abs(current_pos[2]-desired_pos[2])) # Extra penalize pos error
-        ori_err       = np.linalg.norm(current_ori - desired_ori)
+        # ori_err       = np.linalg.norm(current_ori - desired_ori)
+        att_err       = np.linalg.norm(np.array([1.0,2.0,1.0]) * (current_att - desired_att))
         vel_err       = np.linalg.norm(current_vel - desired_vel)
         ang_vel_err   = np.linalg.norm(current_ang_vel - desired_ang_vel)
-        input_err     = np.linalg.norm(action) # It's not an error but let's just call it
-        delta_act_err = np.linalg.norm(action - self.last_act) # It's not an error but let's just call it
+        input_err     = np.linalg.norm(action[:12]) # It's not an error but let's just call it
+        delta_act_err = np.linalg.norm(action[:12] - self.last_act[:12]) # It's not an error but let's just call it
         pid_err       = self._get_pid_error(action[2:])
 
         rewards = np.exp(-np.array([scale_pos, scale_ori, scale_vel, scale_ang_vel, scale_input, scale_delta_act, scale_pid]
@@ -563,6 +568,7 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
     def _terminated(self, obs_curr):
         pos = np.array(obs_curr[0:3], dtype=float)
         vel = np.array(obs_curr[7:10], dtype=float)
+        att = quat2euler_raw(obs_curr[3:7]) # roll, pitch, yaw
         if not((pos <= self.pos_ub).all() 
            and (pos >= self.pos_lb).all()):
             self.num_episode += 1
@@ -584,6 +590,22 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
                   timestep=self.timestep,
                   time=round(self.timestep*self.dt,2)))
             return True
+        elif np.abs(att[0]) >= np.pi/2 or np.abs(att[1]) >= np.pi/2:
+            print("Env {env_num}  |  Episode {epi}  |  Out of attitude bounds: {att}  |  Timestep: {timestep}  |  Time: {time}s".format(
+                  env_num=self.env_num,
+                  epi=self.num_episode,
+                  att=np.round(att,2),
+                  timestep=self.timestep,
+                  time=round(self.timestep*self.dt,2)))
+            return True
+        elif self._get_wing_dist()[1]:
+            print("Env {env_num}  |  Episode {epi}  |  Wing Collision: {col}  |  Timestep: {timestep}  |  Time: {time}s".format(
+                  env_num=self.env_num,
+                  epi=self.num_episode,
+                  col=self._get_wing_dist()[0],
+                  timestep=self.timestep,
+                  time=round(self.timestep*self.dt,2)))
+            return True
         elif self.timestep >= self.max_timesteps:
             print("Env {env_num}  |  Max step reached: Timestep: {timestep}  |  Position: {pos}  |  Time: {time}s".format(
                   env_num=self.env_num,
@@ -596,6 +618,12 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
 
     def _truncated(self):
         return False
+
+    def _get_wing_dist(self):
+        if self.data.geom('Wing').id in self.data.contact.geom and self.data.geom('WingR').id in self.data.contact.geom:
+            collide_val = self.data.contact.dist
+            return collide_val, True
+        return 100, False
 
     def get_bodyIDs(self, body_list):
         bodyID_dic = {}
