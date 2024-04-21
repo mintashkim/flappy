@@ -555,7 +555,7 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         pid_err       = self._get_pid_error(action[2:])
         wing_dist_err = self._get_wing_dist_error()
 
-        print(np.array([pos_err, att_err, vel_err, ang_vel_err, input_err, delta_act_err, pid_err, wing_dist_err]))
+        # print(np.array([pos_err, att_err, vel_err, ang_vel_err, input_err, delta_act_err, pid_err, wing_dist_err]))
 
         rewards = np.exp(-np.array([scale_pos, scale_att, scale_vel, scale_ang_vel, scale_input, scale_delta_act, scale_pid, scale_wing_dist]
                          * np.array([pos_err, att_err, vel_err, ang_vel_err, input_err, delta_act_err, pid_err, wing_dist_err])))
