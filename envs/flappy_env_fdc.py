@@ -245,6 +245,7 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         super().reset(seed=self.env_num)
         if randomize is None: randomize = self.is_randomize
         self._reset_env(randomize)
+        self._init_FDC_states()
         self.action_filter.reset()
         # self.env_randomizer.randomize_dynamics()
         # self._set_dynamics_properties()
@@ -444,37 +445,37 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         self.data.actuator("J5R_angle").ctrl[0] = J5_r
         self.data.actuator("J6R_angle").ctrl[0] = J6_r
 
-        # Update wing_conformation
-        self.p.wing_conformation_L[5] = self.FDC_pos[0, 0]
-        self.p.wing_conformation_L[9] = self.FDC_pos[0, 1]
-        self.p.wing_conformation_L[10] = self.FDC_pos[0, 2]
-        self.p.wing_conformation_R[5] = self.FDC_pos[1, 0]
-        self.p.wing_conformation_R[9] = self.FDC_pos[1, 1]
-        self.p.wing_conformation_R[10] = self.FDC_pos[1, 2]
+        # # Update wing_conformation
+        # self.p.wing_conformation_L[5] = self.FDC_pos[0, 0]
+        # self.p.wing_conformation_L[9] = self.FDC_pos[0, 1]
+        # self.p.wing_conformation_L[10] = self.FDC_pos[0, 2]
+        # self.p.wing_conformation_R[5] = self.FDC_pos[1, 0]
+        # self.p.wing_conformation_R[9] = self.FDC_pos[1, 1]
+        # self.p.wing_conformation_R[10] = self.FDC_pos[1, 2]
 
-        # Compute actual J6v from finite difference
-        if self.data.time == 0:
-            J6v_fd = [0, 0]
-            self.J6_old = np.array([self.J6_l, self.J6_r])
-        J6_current = np.array([self.J6_l, self.J6_r])
-        J6v_fd = (J6_current - self.J6_old) / self.dt
-        self.J6_old = J6_current  # update
+        # # Compute actual J6v from finite difference
+        # if self.data.time == 0:
+        #     J6v_fd = [0, 0]
+        #     self.J6_old = np.array([self.J6_l, self.J6_r])
+        # J6_current = np.array([self.J6_l, self.J6_r])
+        # J6v_fd = (J6_current - self.J6_old) / self.dt
+        # self.J6_old = J6_current  # update
 
-        # NOTE: If Using Custom Aero
-        if self.is_aero: #self aero not implemented yet?
-            xd_L, xd_R, R_body = self._get_original_states()
+        # # NOTE: If Using Custom Aero
+        # if self.is_aero: #self aero not implemented yet?
+        #     xd_L, xd_R, R_body = self._get_original_states()
 
-            # Update Joint 6 velocity with finite difference for aero force computation
-            xd_L[6] = J6v_fd[0]
-            xd_R[6] = J6v_fd[1]
+        #     # Update Joint 6 velocity with finite difference for aero force computation
+        #     xd_L[6] = J6v_fd[0]
+        #     xd_R[6] = J6v_fd[1]
 
-            fa, ua = aero(self.model, self.data, self.xa, xd_L, xd_R, R_body, self.p)
+        #     fa, ua = aero(self.model, self.data, self.xa, xd_L, xd_R, R_body, self.p)
 
-            # Apply Aero forces
-            self.data.xfrc_applied[self.bodyID_dic["Base"]] = [*ua[2:5], *ua[5:8]]
+        #     # Apply Aero forces
+        #     self.data.xfrc_applied[self.bodyID_dic["Base"]] = [*ua[2:5], *ua[5:8]]
 
-            # Integrate Aero States
-            self.xa = self.xa + fa * self.dt
+        #     # Integrate Aero States
+        #     self.xa = self.xa + fa * self.dt
 
     # NOTE: For aero()
     def _get_original_states(self):
@@ -517,7 +518,7 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         w_pid              = 1.0
         w_wing_dist        = 10.0
 
-        reward_weights = np.array([w_position, w_velocity, w_angular_velocity, w_attitude, w_input, w_delta_act, w_pid])
+        reward_weights = np.array([w_position, w_velocity, w_angular_velocity, w_attitude, w_input, w_delta_act, w_pid, w_wing_dist])
         weights = reward_weights / np.sum(reward_weights)  # weight can be adjusted later
 
         scale_pos       = 1.0/5.0
@@ -527,7 +528,7 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         scale_input     = 1.0/15.0
         scale_delta_act = 1.0/1.0
         scale_pid       = 1.0/1.0
-        scale_wing_dist = 1.0/0.01
+        scale_wing_dist = 1.0/0.1
 
         desired_pos, desired_vel, desired_acc = self.ref_traj.get(self.time_in_sec)
 
@@ -553,6 +554,8 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         delta_act_err = np.linalg.norm(action[:12] - self.last_act[:12]) # It's not an error but let's just call it
         pid_err       = self._get_pid_error(action[2:])
         wing_dist_err = self._get_wing_dist_error()
+
+        print(np.array([pos_err, att_err, vel_err, ang_vel_err, input_err, delta_act_err, pid_err, wing_dist_err]))
 
         rewards = np.exp(-np.array([scale_pos, scale_att, scale_vel, scale_ang_vel, scale_input, scale_delta_act, scale_pid, scale_wing_dist]
                          * np.array([pos_err, att_err, vel_err, ang_vel_err, input_err, delta_act_err, pid_err, wing_dist_err])))
@@ -601,9 +604,11 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         return pid_err
 
     def _get_wing_dist_error(self):
-        wing_dist = self.data.contact.dist
-        if wing_dist < 0.1: return wing_dist
-        else: return 0 
+        if self.data.geom('Wing').id in self.data.contact.geom and self.data.geom('WingR').id in self.data.contact.geom:
+            wing_dist = self.data.contact.dist[0]
+            return wing_dist
+        else:
+            return 0
 
     def _terminated(self, obs_curr):
         pos = np.array(obs_curr[0:3], dtype=float)
@@ -638,11 +643,11 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
                   timestep=self.timestep,
                   time=round(self.timestep*self.dt,2)))
             return True
-        elif self._get_wing_dist()[1]:
+        elif self._get_wing_dist() < 0.01:
             print("Env {env_num}  |  Episode {epi}  |  Wing Collision: {col}  |  Timestep: {timestep}  |  Time: {time}s".format(
                   env_num=self.env_num,
                   epi=self.num_episode,
-                  col=self._get_wing_dist()[0],
+                  col=self._get_wing_dist(),
                   timestep=self.timestep,
                   time=round(self.timestep*self.dt,2)))
             return True
@@ -661,9 +666,9 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
 
     def _get_wing_dist(self):
         if self.data.geom('Wing').id in self.data.contact.geom and self.data.geom('WingR').id in self.data.contact.geom:
-            collide_val = self.data.contact.dist
-            return collide_val, True
-        return 100, False
+            wing_dist = self.data.contact.dist[0]
+            return wing_dist
+        return 100
 
     def get_bodyIDs(self, body_list):
         bodyID_dic = {}

@@ -141,7 +141,7 @@
   </equality>
 
   <contact>
-    <pair name="wing collision" geom1="Wing" geom2="WingR" margin="0.01"/>
+    <pair name="wing collision" geom1="Wing" geom2="WingR" margin="0.1"/>
   </contact>
 
   <actuator>
