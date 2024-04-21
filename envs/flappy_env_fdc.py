@@ -474,7 +474,7 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
             self.future_traj.append(np.concatenate([desired_pos, desired_vel]))
 
     def _get_reward(self, action, obs_curr):
-        names = ['pos_rew', 'vel_rew', 'ang_vel_rew', 'att_rew', 'input_rew', 'delta_acs_rew']
+        names = ['pos_rew', 'vel_rew', 'ang_vel_rew', 'att_rew', 'input_rew', 'delta_act_rew', 'pid_rew', 'wing_dist_rew']
 
         w_position         = np.average(self.previous_epi_len)//1000 + 1 # Focus on position more as it can fly better
         w_velocity         = np.average(self.previous_epi_len)//2000 + 1
@@ -483,6 +483,7 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         w_input            = 0.5
         w_delta_act        = 0.5
         w_pid              = 1.0
+        w_wing_dist        = 10.0
 
         reward_weights = np.array([w_position, w_velocity, w_angular_velocity, w_attitude, w_input, w_delta_act, w_pid])
         weights = reward_weights / np.sum(reward_weights)  # weight can be adjusted later
@@ -494,6 +495,7 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         scale_input     = 6.0
         scale_delta_act = 1.0
         scale_pid       = 1.0
+        scale_wing_dist = 0.01
 
         desired_pos, desired_vel, desired_acc = self.ref_traj.get(self.time_in_sec)
 
@@ -518,9 +520,10 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         input_err     = np.linalg.norm(action[:12]) # It's not an error but let's just call it
         delta_act_err = np.linalg.norm(action[:12] - self.last_act[:12]) # It's not an error but let's just call it
         pid_err       = self._get_pid_error(action[2:])
+        wing_dist_err = self._get_wing_dist_error()
 
-        rewards = np.exp(-np.array([scale_pos, scale_att, scale_vel, scale_ang_vel, scale_input, scale_delta_act, scale_pid]
-                         * np.array([pos_err, att_err, vel_err, ang_vel_err, input_err, delta_act_err, pid_err])))
+        rewards = np.exp(-np.array([scale_pos, scale_att, scale_vel, scale_ang_vel, scale_input, scale_delta_act, scale_pid, scale_wing_dist]
+                         * np.array([pos_err, att_err, vel_err, ang_vel_err, input_err, delta_act_err, pid_err, wing_dist_err])))
         reward_dict = dict(zip(names, weights * rewards)) 
         total_reward = np.sum(weights * rewards)
 
@@ -564,6 +567,11 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         else:
             pid_err = 0
         return pid_err
+
+    def _get_wing_dist_error(self):
+        wing_dist = self.data.contact.dist
+        if wing_dist < 0.1:
+            return 
 
     def _terminated(self, obs_curr):
         pos = np.array(obs_curr[0:3], dtype=float)
