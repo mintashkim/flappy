@@ -1,0 +1,4 @@
+DOF: Moving along all directions
+Timestep: 1e-3
+Aerodynamics: Mujoco built-in
+Reward: if terminated: if timestep < 10: reward -= 10

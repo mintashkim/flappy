@@ -1,0 +1,58 @@
+DOF: Moving along all directions
+Timestep: 1e-3
+Aerodynamics: Mujoco built-in
+Reward: if terminated: if timestep < 1000: reward -= 10
+Reward: Rich-Sutton reward - No
+Reward: Extra penalty for z-error, Extra penalty for x,y-error - No
+Launch Control: if timestep < 100 - No
+I/O History: Short(4) / Obs (107,) - No
+Action Bound: ctrl[6:] = [0, 0]
+
+log_path = os.path.join('logs')
+save_path = os.path.join('saved_models/saved_models_PPO_16')
+
+def create_env():
+    env = FlappyEnv(render_mode="human")
+    return env
+env = DummyVecEnv([create_env for _ in range(4)])
+# env = VecMonitor(DummyVecEnv([lambda: env]))
+
+stop_callback = StopTrainingOnRewardThreshold(reward_threshold=20000, verbose=1)
+eval_callback = EvalCallback(env,
+                             callback_on_new_best=stop_callback,
+                             eval_freq=10000,
+                             best_model_save_path=save_path,
+                             verbose=1)
+
+# NOTE: if is_history: use 128 or more
+net_arch = {'pi': [256,128,128,64],
+            'vf': [256,128,128,64]}
+# net_arch = {'pi': [64,64,64],
+#             'vf': [64,64,64]}
+
+def linear_schedule(initial_value):
+    if isinstance(initial_value, str):
+        initial_value = float(initial_value)
+    def func(progress):
+        return progress * initial_value
+    return func
+
+model = PPO('MlpPolicy', 
+            env=env,
+            learning_rate=3e-4,
+            n_steps=2048, # The number of steps to run for each environment per update / 2048
+            batch_size=256,
+            gamma=0.99,  # 0.99 # look forward 1.65s
+            gae_lambda=0.95,
+            clip_range=linear_schedule(0.2),
+            ent_coef=0.01, # Makes PPO explore
+            verbose=1,
+            policy_kwargs={'net_arch':net_arch},
+            tensorboard_log=log_path,
+            device='mps')
+
+model.learn(total_timesteps=1e+7, # The total number of samples (env steps) to train on
+            progress_bar=True,
+            callback=eval_callback)
+
+model.save(save_path)
