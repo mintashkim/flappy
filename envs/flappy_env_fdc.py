@@ -488,14 +488,14 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
         reward_weights = np.array([w_position, w_velocity, w_angular_velocity, w_attitude, w_input, w_delta_act, w_pid])
         weights = reward_weights / np.sum(reward_weights)  # weight can be adjusted later
 
-        scale_pos       = 5.0
-        scale_att       = 1.0
-        scale_vel       = 5.0
-        scale_ang_vel   = 2.0
-        scale_input     = 6.0
-        scale_delta_act = 1.0
-        scale_pid       = 1.0
-        scale_wing_dist = 0.01
+        scale_pos       = 1.0/5.0
+        scale_att       = 1.0/(np.pi/2)
+        scale_vel       = 1.0/5.0
+        scale_ang_vel   = 1.0/2.0
+        scale_input     = 1.0/15.0
+        scale_delta_act = 1.0/1.0
+        scale_pid       = 1.0/1.0
+        scale_wing_dist = 1.0/0.01
 
         desired_pos, desired_vel, desired_acc = self.ref_traj.get(self.time_in_sec)
 
@@ -570,8 +570,8 @@ class FlappyEnv(MujocoEnv, utils.EzPickle):
 
     def _get_wing_dist_error(self):
         wing_dist = self.data.contact.dist
-        if wing_dist < 0.1:
-            return 
+        if wing_dist < 0.1: return wing_dist
+        else: return 0 
 
     def _terminated(self, obs_curr):
         pos = np.array(obs_curr[0:3], dtype=float)
