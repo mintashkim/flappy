@@ -1,5 +1,0 @@
-DOF: Moving along all directions
-Timestep: 1e-3
-Aerodynamics: Mujoco built-in
-Reward: if terminated: reward -= 10
-Message: Ceased due to directory error. Go to PPO_4.
